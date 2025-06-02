@@ -1,0 +1,10 @@
+# Ignore Supabase configuration files
+supabase/
+.vscode
+supabase.txt
+
+# Ignore DS_Store
+.DS_Store
+
+# Ignore env
+.env
