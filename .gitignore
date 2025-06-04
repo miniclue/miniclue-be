@@ -7,4 +7,7 @@ supabase.txt
 .DS_Store
 
 # Ignore env
-.env
+.env*
+
+# Ignore Cursor rules
+.cursor/
