@@ -21,9 +21,9 @@ func NewUserHandler(us service.UserService, validate *validator.Validate) *UserH
 }
 
 // RegisterRoutes mounts user-related routes onto an http.ServeMux
-func (h *UserHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/users/", h.handleUsers)
-	mux.HandleFunc("/api/users/{userID}", h.handleUserByID) // Path-based parameters for ServeMux
+func (h *UserHandler) RegisterRoutes(mux *http.ServeMux, middleware func(http.Handler) http.Handler) {
+	mux.Handle("/api/users/", middleware(http.HandlerFunc(h.handleUsers)))
+	mux.Handle("/api/users/{userID}", middleware(http.HandlerFunc(h.handleUserByID)))
 }
 
 func (h *UserHandler) handleUsers(w http.ResponseWriter, r *http.Request) {

@@ -4,6 +4,7 @@ import (
 	"app/internal/config"
 	"app/internal/handler"
 	"app/internal/logger"
+	"app/internal/middleware"
 	"app/internal/repository"
 	"app/internal/service"
 	"database/sql"
@@ -46,9 +47,12 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	userSvc := service.NewUserService(userRepo)
 	userHandler := handler.NewUserHandler(userSvc, validate)
 
+	// 4. Initialize middleware
+	authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)
+
 	// 5. Create ServeMux router
 	mux := http.NewServeMux()
-	userHandler.RegisterRoutes(mux)
+	userHandler.RegisterRoutes(mux, authMiddleware)
 
 	return mux, db, nil
 }

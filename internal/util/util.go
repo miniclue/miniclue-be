@@ -1,9 +1,10 @@
 package util
 
 import (
+	"time"
+
 	"github.com/dgrijalva/jwt-go"
 	"golang.org/x/crypto/bcrypt"
-	"time"
 )
 
 func HashPassword(password string) (string, error) {
@@ -18,14 +19,13 @@ func CheckPasswordHash(hash, password string) bool {
 
 // JWT claims structure
 type Claims struct {
-	UserID int64 `json:"user_id"`
+	Email string `json:"email"`
 	jwt.StandardClaims
 }
 
 func GenerateJWT(userID int64, secret string) (string, error) {
 	expiration := time.Now().Add(24 * time.Hour)
 	claims := &Claims{
-		UserID: userID,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: expiration.Unix(),
 		},

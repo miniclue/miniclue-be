@@ -11,7 +11,7 @@ type Config struct {
 	DBUser      string `envconfig:"DB_USER" required:"true"`
 	DBPassword  string `envconfig:"DB_PASSWORD" required:"true"`
 	DBName      string `envconfig:"DB_NAME" required:"true"`
-	JWTSecret   string `envconfig:"JWT_SECRET"`
+	JWTSecret   string `envconfig:"SUPABASE_LOCAL_JWT_SECRET" required:"true"`
 }
 
 func Load() (*Config, error) {
