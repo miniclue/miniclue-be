@@ -1,7 +1,5 @@
-# Ignore Supabase configuration files
-supabase/
+# Ignore VSCode
 .vscode
-supabase.txt
 
 # Ignore DS_Store
 .DS_Store
