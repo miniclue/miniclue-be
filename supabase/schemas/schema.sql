@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS lectures (
   user_id    UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   course_id  UUID        NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
   title      TEXT        NOT NULL,
+  pdf_url    TEXT        NOT NULL,
   status     VARCHAR(32) NOT NULL DEFAULT 'uploaded',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

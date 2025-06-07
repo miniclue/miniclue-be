@@ -20,9 +20,9 @@ VALUES
   ('10000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Intro to AI', 'A beginner course on AI', FALSE);
 
 -- 4. Lectures
-INSERT INTO lectures (id, user_id, course_id, title, status)
+INSERT INTO lectures (id, user_id, course_id, title, pdf_url, status)
 VALUES
-  ('20000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Lecture 1: What is AI?', 'uploaded');
+  ('20000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Lecture 1: What is AI?', 'https://example.com/pdf/lecture1.pdf', 'uploaded');
 
 -- 5. Slides
 INSERT INTO slides (id, lecture_id, slide_number)

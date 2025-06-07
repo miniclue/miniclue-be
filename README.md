@@ -9,10 +9,6 @@
 
 * `POST   /api/v1/courses`
   * Create a new course (`{ title, description?, isDefault?: boolean }`)
-* `POST   /api/v1/courses/default`
-  * Create the user’s default “drafts” course for ungrouped lectures
-* `GET    /api/v1/courses`
-  * List all courses (`?limit=&offset=&status=`)
 * `GET    /api/v1/courses/{courseId}`
   * Fetch metadata & status for one course
 * `PUT    /api/v1/courses/{courseId}`
@@ -29,7 +25,7 @@
 * `POST   /api/v1/courses/{courseId}/lectures/upload`
   * Upload PDF + metadata → creates a new lecture under that course (or default drafts course if using `/courses/default/lectures/upload`) and returns `{ lectureId }`
 * `GET    /api/v1/courses/{courseId}/lectures/{lectureId}`
-  * Fetch lecture metadata & status
+  * Fetch lecture metadata, status & PDF
 * `PUT    /api/v1/courses/{courseId}/lectures/{lectureId}`
   * Update lecture metadata (title, tags, etc.)
 * `DELETE /api/v1/courses/{courseId}/lectures/{lectureId}`
@@ -46,12 +42,9 @@
 
 **Slides & Explanations**
 
-* `GET /api/v1/courses/{courseId}/lectures/{lectureId}/slides`
-  * List slide metadata (`?limit=&offset=`)
-* `GET /api/v1/courses/{courseId}/lectures/{lectureId}/slides/{n}`
-  * Fetch raw slide text + image URLs
-* `GET /api/v1/courses/{courseId}/lectures/{lectureId}/slides/{n}/explanation`
-  * Retrieve (or trigger+retrieve) that slide’s Minto-Pyramid explanation; cached in Redis
+* `GET /api/v1/courses/{courseId}/lectures/{lectureId}/explanations`
+  * Use limit and offset params
+  * Cached in Redis
 
 ---
 
@@ -75,17 +68,6 @@
 * `PUT  /api/v1/users/me`
   * Update own profile (name, avatar, prefs)
 * `GET  /api/v1/users/me/courses`
-  * List courses the user owns or is enrolled in
-
----
-
-**Users & Dashboard**
-
-* `GET  /api/v1/users/me`
-  * Fetch current user’s profile for dashboard
-* `PUT  /api/v1/users/me`
-  * Update own profile (name, avatar, prefs)
-* `GET  /api/v1/users/{userId}`
   * List courses the user owns or is enrolled in
 * `GET  /api/v1/users/me/recents`
   * List the user’s most recently created or accessed lectures (`?limit=&offset=`)
