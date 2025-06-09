@@ -1,8 +1,8 @@
 package router
 
 import (
+	"app/internal/api/v1/handler"
 	"app/internal/config"
-	"app/internal/handler"
 	"app/internal/logger"
 	"app/internal/middleware"
 	"app/internal/repository"
@@ -52,7 +52,20 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 
 	// 5. Create ServeMux router
 	mux := http.NewServeMux()
-	userHandler.RegisterRoutes(mux, authMiddleware)
+
+	// Create a subrouter for API v1 with the /api/v1 prefix
+	apiV1Mux := http.NewServeMux()
+	userHandler.RegisterRoutes(apiV1Mux, authMiddleware)
+
+	// Mount the API v1 routes under /api/v1
+	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiV1Mux))
+
+	// Handle /api and all its subpaths
+	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
+		// Get the rest of the path after /api
+		restOfPath := r.URL.Path[4:] // Remove "/api" from the beginning
+		http.Redirect(w, r, "/api/v1"+restOfPath, http.StatusMovedPermanently)
+	})
 
 	return mux, db, nil
 }
