@@ -15,17 +15,19 @@ import (
 )
 
 type UserHandler struct {
-	svc      service.UserService
-	validate *validator.Validate
+	userService   service.UserService
+	courseService service.CourseService
+	validate      *validator.Validate
 }
 
-func NewUserHandler(svc service.UserService, v *validator.Validate) *UserHandler {
-	return &UserHandler{svc: svc, validate: v}
+func NewUserHandler(userService service.UserService, courseService service.CourseService, v *validator.Validate) *UserHandler {
+	return &UserHandler{userService: userService, courseService: courseService, validate: v}
 }
 
 // RegisterRoutes mounts v1 user routes
 func (h *UserHandler) RegisterRoutes(mux *http.ServeMux, authMw func(http.Handler) http.Handler) {
 	mux.Handle("/users/me", authMw(http.HandlerFunc(h.handleUsers)))
+	mux.Handle("/users/me/courses", authMw(http.HandlerFunc(h.getUserCourses)))
 }
 
 func (h *UserHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +37,6 @@ func (h *UserHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
 
 	case r.Method == http.MethodGet && r.URL.Path == "/users/me":
 		h.getUser(w, r)
-
 	default:
 		http.NotFound(w, r)
 	}
@@ -71,7 +72,7 @@ func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. Call service to create user profile
-	createdUser, err := h.svc.CreateUser(r.Context(), userModel)
+	createdUser, err := h.userService.CreateUser(r.Context(), userModel)
 	if err != nil {
 		http.Error(w, "Failed to create user: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -100,7 +101,7 @@ func (h *UserHandler) getUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.svc.GetUser(r.Context(), userId)
+	user, err := h.userService.GetUser(r.Context(), userId)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrUserNotFound):
@@ -120,4 +121,40 @@ func (h *UserHandler) getUser(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *UserHandler) getUserCourses(w http.ResponseWriter, r *http.Request) {
+	// 1. Check method
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	// 1. Extract UserID from context
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: user ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Call service to get courses by user ID
+	courses, err := h.courseService.GetCoursesByUserID(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve user courses: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 3. Map domain models to response DTOs
+	var courseDTOs []dto.CourseResponseDTO
+	for _, course := range courses {
+		courseDTOs = append(courseDTOs, dto.CourseResponseDTO{
+			CourseID:    course.CourseID,
+			Title:       course.Title,
+			Description: course.Description,
+		})
+	}
+
+	// 4. Return response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(courseDTOs)
 }

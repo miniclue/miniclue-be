@@ -53,7 +53,11 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	// 4. Initialize repositories & services & handlers
 	userRepo := repository.NewUserRepo(db)
 	userSvc := service.NewUserService(userRepo)
-	userHandler := handler.NewUserHandler(userSvc, validate)
+
+	courseRepo := repository.NewCourseRepo(db)
+	courseSvc := service.NewCourseService(courseRepo)
+
+	userHandler := handler.NewUserHandler(userSvc, courseSvc, validate)
 
 	// 4. Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)
