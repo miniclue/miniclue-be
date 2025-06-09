@@ -65,7 +65,9 @@
 
 * `GET  /api/v1/users/me`
   * Fetch current user’s profile for dashboard
-* `PUT  /api/v1/users/me`
+* `POST /api/v1/users/me`
+  * Create a new user profile
+* `PUT  /api/v1/users/me` (to be implemented)
   * Update own profile (name, avatar, prefs)
 * `GET  /api/v1/users/me/courses`
   * List courses the user owns or is enrolled in
