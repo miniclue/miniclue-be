@@ -1,73 +1,64 @@
+// internal/service/user_service.go
 package service
 
 import (
-	"app/internal/model"
-	"app/internal/repository"
-	"app/internal/util" // e.g., for password hashing
-	"context"
-	"errors"
+    "context"
+    "errors"
+
+    "app/internal/model"
+    "app/internal/repository"
+    "app/internal/util"
+)
+
+var (
+    ErrUserNotFound          = errors.New("user not found")
+    ErrEmailAlreadyRegistered = errors.New("email already registered")
 )
 
 type UserService interface {
-	Register(ctx context.Context, dto *model.UserCreateDTO) (*model.UserResponseDTO, error)
-	Get(ctx context.Context, id int64) (*model.UserResponseDTO, error)
-	// ... other methods
+    Register(ctx context.Context, u *model.User) (*model.User, error)
+    Get(ctx context.Context, id int64) (*model.User, error)
 }
 
 type userService struct {
-	repo repository.UserRepository
+    repo repository.UserRepository
 }
 
 func NewUserService(repo repository.UserRepository) UserService {
-	return &userService{repo: repo}
+    return &userService{repo: repo}
 }
 
-func (s *userService) Register(ctx context.Context, dto *model.UserCreateDTO) (*model.UserResponseDTO, error) {
-	// 1. Validate DTO (can use validator in handler before calling service)
-	// 2. Check if email already exists
-	existing, err := s.repo.GetByEmail(ctx, dto.Email)
-	if err != nil {
-		return nil, err
-	}
-	if existing != nil {
-		return nil, errors.New("email already registered")
-	}
-	// 3. Hash password
-	hashed, err := util.HashPassword(dto.Password)
-	if err != nil {
-		return nil, err
-	}
-	// 4. Create model.User
-	user := &model.User{
-		Email:    dto.Email,
-		Name:     dto.Name,
-		Password: hashed,
-	}
-	if err := s.repo.Create(ctx, user); err != nil {
-		return nil, err
-	}
-	// 5. Build response DTO
-	resp := &model.UserResponseDTO{
-		ID:        user.ID,
-		Email:     user.Email,
-		Name:      user.Name,
-		CreatedAt: user.CreatedAt,
-	}
-	return resp, nil
+func (s *userService) Register(ctx context.Context, u *model.User) (*model.User, error) {
+    // 1) Domain check
+    exists, err := s.repo.GetByEmail(ctx, u.Email)
+    if err != nil {
+        return nil, err
+    }
+    if exists != nil {
+        return nil, ErrEmailAlreadyRegistered
+    }
+
+    // 2) Hash password
+    hash, err := util.HashPassword(u.Password)
+    if err != nil {
+        return nil, err
+    }
+    u.Password = hash
+
+    // 3) Persist
+    if err := s.repo.Create(ctx, u); err != nil {
+        return nil, err
+    }
+    return u, nil
 }
 
-func (s *userService) Get(ctx context.Context, id int64) (*model.UserResponseDTO, error) {
-	user, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if user == nil {
-		return nil, nil // or custom ErrNotFound
-	}
-	return &model.UserResponseDTO{
-		ID:        user.ID,
-		Email:     user.Email,
-		Name:      user.Name,
-		CreatedAt: user.CreatedAt,
-	}, nil
+func (s *userService) Get(ctx context.Context, id int64) (*model.User, error) {
+    u, err := s.repo.GetByID(ctx, id)
+    if err != nil {
+        return nil, err
+    }
+    if u == nil {
+        return nil, ErrUserNotFound
+    }
+    return u, nil
 }

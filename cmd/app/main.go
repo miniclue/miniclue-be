@@ -10,7 +10,7 @@ import (
 
 	"app/internal/config"
 	"app/internal/logger"
-	"app/internal/router"
+	"app/internal/api/v1/router"
 
 	"github.com/joho/godotenv"
 )
