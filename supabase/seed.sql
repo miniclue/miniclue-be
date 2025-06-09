@@ -9,9 +9,9 @@ VALUES
 SELECT * FROM auth.users;
 
 -- 2. User Profile
-INSERT INTO user_profiles (user_id, full_name, avatar_url)
+INSERT INTO user_profiles (user_id, name, email, avatar_url)
 VALUES
-  ('00000000-0000-0000-0000-000000000001', 'Alice Example', 'https://example.com/avatar1.png');
+  ('00000000-0000-0000-0000-000000000001', 'Alice Example', 'user1@example.com', 'https://example.com/avatar1.png');
 
 -- 3. Courses
 INSERT INTO courses (id, user_id, title, description, is_default)

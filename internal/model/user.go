@@ -4,9 +4,9 @@ import "time"
 
 // User represents a user in the system
 type User struct {
-	ID        int64     `db:"id" json:"id"`
-	Email     string    `db:"email" json:"email"`
+	UserID    string    `db:"user_id" json:"user_id"`
 	Name      string    `db:"name" json:"name"`
-	Password  string    `db:"-"` // omit from JSON responses
+	Email     string    `db:"email" json:"email"`
+	AvatarURL string    `db:"avatar_url" json:"avatar_url"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }

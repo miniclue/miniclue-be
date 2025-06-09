@@ -34,6 +34,14 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 		logger.Fatal().Msgf("Failed to open DB connection: %v", err)
 		return nil, nil, err
 	}
+
+	// Ping the database to ensure connection is valid
+	if err := db.Ping(); err != nil {
+		logger.Fatal().Msgf("Failed to ping DB: %v", err)
+		return nil, nil, err
+	}
+	logger.Info().Msg("Database connection successful")
+
 	// Set reasonable connection pool limits
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(25)

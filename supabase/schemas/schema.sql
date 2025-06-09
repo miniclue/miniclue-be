@@ -24,7 +24,8 @@ CREATE INDEX IF NOT EXISTS idx_courses_user_id ON courses(user_id);
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS user_profiles (
   user_id    UUID        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  full_name  TEXT        DEFAULT '',
+  name       TEXT        DEFAULT '',
+  email      TEXT        DEFAULT '',
   avatar_url TEXT        DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

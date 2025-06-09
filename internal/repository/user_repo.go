@@ -9,10 +9,8 @@ import (
 )
 
 type UserRepository interface {
-	Create(ctx context.Context, u *model.User) error
-	GetByID(ctx context.Context, id int64) (*model.User, error)
-	GetByEmail(ctx context.Context, email string) (*model.User, error)
-	// ... other methods (Update, Delete, List, etc.)
+	CreateUser(ctx context.Context, u *model.User) error
+	GetUserByID(ctx context.Context, id string) (*model.User, error)
 }
 
 type userRepo struct {
@@ -23,11 +21,11 @@ func NewUserRepo(db *sql.DB) UserRepository {
 	return &userRepo{db: db}
 }
 
-func (r *userRepo) Create(ctx context.Context, u *model.User) error {
-	query := `INSERT INTO users (email, name, password, created_at)
-              VALUES ($1, $2, $3, $4) RETURNING id`
+func (r *userRepo) CreateUser(ctx context.Context, u *model.User) error {
+	query := `INSERT INTO user_profiles (email, name, avatar_url, created_at)
+              VALUES ($1, $2, $3, $4) RETURNING user_id`
 	now := time.Now().UTC()
-	err := r.db.QueryRowContext(ctx, query, u.Email, u.Name, u.Password, now).Scan(&u.ID)
+	err := r.db.QueryRowContext(ctx, query, u.Email, u.Name, u.AvatarURL, now).Scan(&u.UserID)
 	if err != nil {
 		return err
 	}
@@ -35,21 +33,15 @@ func (r *userRepo) Create(ctx context.Context, u *model.User) error {
 	return nil
 }
 
-func (r *userRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
+func (r *userRepo) GetUserByID(ctx context.Context, id string) (*model.User, error) {
 	var u model.User
-	query := `SELECT id, email, name, password, created_at FROM users WHERE id=$1`
+	query := `SELECT user_id, email, name, avatar_url, created_at FROM user_profiles WHERE user_id=$1`
 	row := r.db.QueryRowContext(ctx, query, id)
-	if err := row.Scan(&u.ID, &u.Email, &u.Name, &u.Password, &u.CreatedAt); err != nil {
+	if err := row.Scan(&u.UserID, &u.Email, &u.Name, &u.AvatarURL, &u.CreatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
 	return &u, nil
-}
-
-func (r *userRepo) GetByEmail(ctx context.Context, email string) (*model.User, error) {
-	// Similar query with WHERE email=$1
-	// ...
-	return nil, nil
 }

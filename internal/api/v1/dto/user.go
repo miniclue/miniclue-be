@@ -4,15 +4,18 @@ import "time"
 
 // UserCreateDTO is used for incoming create requests
 type UserCreateDTO struct {
-	Email    string `json:"email" validate:"required,email"`
-	Name     string `json:"name" validate:"required"`
-	Password string `json:"password" validate:"required,min=8"`
+	UserID    string    `json:"user_id"`
+	Name      string    `json:"name"`
+	Email     string    `json:"email"`
+	AvatarURL string    `json:"avatar_url"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // UserResponseDTO is returned in API responses
 type UserResponseDTO struct {
-	ID        int64     `json:"id"`
-	Email     string    `json:"email"`
+	UserID    string    `json:"user_id"`
 	Name      string    `json:"name"`
+	Email     string    `json:"email"`
+	AvatarURL string    `json:"avatar_url"`
 	CreatedAt time.Time `json:"created_at"`
 }
