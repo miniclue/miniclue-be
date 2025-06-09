@@ -14,7 +14,7 @@ var (
 )
 
 type UserService interface {
-	// RegisterUser(ctx context.Context, u *model.User) (*model.User, error)
+	CreateUser(ctx context.Context, u *model.User) (*model.User, error)
 	GetUser(ctx context.Context, id string) (*model.User, error)
 }
 
@@ -26,9 +26,13 @@ func NewUserService(repo repository.UserRepository) UserService {
 	return &userService{repo: repo}
 }
 
-// func (s *userService) RegisterUser(ctx context.Context, u *model.User) (*model.User, error) {
-//     return nil, nil
-// }
+func (s *userService) CreateUser(ctx context.Context, u *model.User) (*model.User, error) {
+	err := s.repo.CreateUser(ctx, u)
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
+}
 
 func (s *userService) GetUser(ctx context.Context, id string) (*model.User, error) {
 	u, err := s.repo.GetUserByID(ctx, id)

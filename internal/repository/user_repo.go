@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 )
 
 type UserRepository interface {
@@ -22,22 +21,20 @@ func NewUserRepo(db *sql.DB) UserRepository {
 }
 
 func (r *userRepo) CreateUser(ctx context.Context, u *model.User) error {
-	query := `INSERT INTO user_profiles (email, name, avatar_url, created_at)
-              VALUES ($1, $2, $3, $4) RETURNING user_id`
-	now := time.Now().UTC()
-	err := r.db.QueryRowContext(ctx, query, u.Email, u.Name, u.AvatarURL, now).Scan(&u.UserID)
+	query := `INSERT INTO user_profiles (user_id, name, email, avatar_url)
+              VALUES ($1, $2, $3, $4) RETURNING user_id, name, email, avatar_url, created_at, updated_at`
+	err := r.db.QueryRowContext(ctx, query, u.UserID, u.Name, u.Email, u.AvatarURL).Scan(&u.UserID, &u.Name, &u.Email, &u.AvatarURL, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return err
 	}
-	u.CreatedAt = now
 	return nil
 }
 
 func (r *userRepo) GetUserByID(ctx context.Context, id string) (*model.User, error) {
 	var u model.User
-	query := `SELECT user_id, email, name, avatar_url, created_at FROM user_profiles WHERE user_id=$1`
+	query := `SELECT user_id, email, name, avatar_url, created_at, updated_at FROM user_profiles WHERE user_id=$1`
 	row := r.db.QueryRowContext(ctx, query, id)
-	if err := row.Scan(&u.UserID, &u.Email, &u.Name, &u.AvatarURL, &u.CreatedAt); err != nil {
+	if err := row.Scan(&u.UserID, &u.Email, &u.Name, &u.AvatarURL, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}

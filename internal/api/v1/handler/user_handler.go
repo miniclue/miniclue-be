@@ -7,7 +7,8 @@ import (
 
 	"app/internal/api/v1/dto"
 	"app/internal/middleware"
-	// "app/internal/model"
+
+	"app/internal/model"
 	"app/internal/service"
 
 	"github.com/go-playground/validator/v10"
@@ -41,50 +42,61 @@ func (h *UserHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
-	// var req dto.UserCreateDTO
-	// if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-	// 	http.Error(w, "invalid JSON payload", http.StatusBadRequest)
-	// 	return
-	// }
-	// if err := h.validate.Struct(&req); err != nil {
-	// 	http.Error(w, "validation failed: "+err.Error(), http.StatusBadRequest)
-	// 	return
-	// }
+	// 1. Extract UserID from context
+	userId, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userId == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
 
-	// // Map DTO → domain model
-	// user := &model.User{
-	// 	Email:    req.Email,
-	// 	Name:     req.Name,
-	// 	Password: req.Password, // service will hash
-	// }
+	// 2. Decode request body into DTO
+	var req dto.UserCreateDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	// created, err := h.svc.Register(r.Context(), user)
-	// if err != nil {
-	// 	switch {
-	// 	case errors.Is(err, service.ErrEmailAlreadyRegistered):
-	// 		http.Error(w, err.Error(), http.StatusConflict)
-	// 	default:
-	// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 	}
-	// 	return
-	// }
+	// 3. Validate DTO
+	if err := h.validate.Struct(&req); err != nil {
+		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	// // Map domain → response DTO
-	// resp := dto.UserResponseDTO{
-	// 	ID:        created.ID,
-	// 	Email:     created.Email,
-	// 	Name:      created.Name,
-	// 	CreatedAt: created.CreatedAt,
-	// }
-	// w.Header().Set("Content-Type", "application/json")
-	// w.WriteHeader(http.StatusCreated)
-	// json.NewEncoder(w).Encode(resp)
+	// 4. Create model.User from DTO and context UserID
+	userModel := &model.User{
+		UserID:    userId,
+		Name:      req.Name,
+		Email:     req.Email,
+		AvatarURL: req.AvatarURL,
+	}
+
+	// 5. Call service to create user profile
+	createdUser, err := h.svc.CreateUser(r.Context(), userModel)
+	if err != nil {
+		http.Error(w, "Failed to create user: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 6. Map domain model to response DTO
+	resp := dto.UserResponseDTO{
+		UserID:    createdUser.UserID,
+		Name:      createdUser.Name,
+		Email:     createdUser.Email,
+		AvatarURL: createdUser.AvatarURL,
+		CreatedAt: createdUser.CreatedAt,
+		UpdatedAt: createdUser.UpdatedAt,
+	}
+
+	// 7. Return response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (h *UserHandler) getUser(w http.ResponseWriter, r *http.Request) {
 	userId, ok := r.Context().Value(middleware.UserContextKey).(string)
 	if !ok {
-		http.Error(w, "User ID not found in context", http.StatusInternalServerError)
+		http.Error(w, "User ID not found in context", http.StatusUnauthorized)
 		return
 	}
 
