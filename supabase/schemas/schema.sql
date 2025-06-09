@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS lectures (
   pdf_url    TEXT        NOT NULL,
   status     VARCHAR(32) NOT NULL DEFAULT 'uploaded',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  accessed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_lectures_user_id   ON lectures(user_id);
 CREATE INDEX IF NOT EXISTS idx_lectures_course_id ON lectures(course_id);

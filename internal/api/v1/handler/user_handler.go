@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"app/internal/api/v1/dto"
 	"app/internal/middleware"
@@ -15,19 +16,19 @@ import (
 )
 
 type UserHandler struct {
-	userService   service.UserService
-	courseService service.CourseService
-	validate      *validator.Validate
+	userService service.UserService
+	validate    *validator.Validate
 }
 
-func NewUserHandler(userService service.UserService, courseService service.CourseService, v *validator.Validate) *UserHandler {
-	return &UserHandler{userService: userService, courseService: courseService, validate: v}
+func NewUserHandler(userService service.UserService, v *validator.Validate) *UserHandler {
+	return &UserHandler{userService: userService, validate: v}
 }
 
 // RegisterRoutes mounts v1 user routes
 func (h *UserHandler) RegisterRoutes(mux *http.ServeMux, authMw func(http.Handler) http.Handler) {
 	mux.Handle("/users/me", authMw(http.HandlerFunc(h.handleUsers)))
 	mux.Handle("/users/me/courses", authMw(http.HandlerFunc(h.getUserCourses)))
+	mux.Handle("/users/me/recents", authMw(http.HandlerFunc(h.getRecentLectures)))
 }
 
 func (h *UserHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +73,7 @@ func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. Call service to create user profile
-	createdUser, err := h.userService.CreateUser(r.Context(), userModel)
+	createdUser, err := h.userService.Create(r.Context(), userModel)
 	if err != nil {
 		http.Error(w, "Failed to create user: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -101,7 +102,7 @@ func (h *UserHandler) getUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.userService.GetUser(r.Context(), userId)
+	user, err := h.userService.Get(r.Context(), userId)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrUserNotFound):
@@ -137,16 +138,16 @@ func (h *UserHandler) getUserCourses(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Call service to get courses by user ID
-	courses, err := h.courseService.GetCoursesByUserID(r.Context(), userID)
+	courses, err := h.userService.GetCourses(r.Context(), userID)
 	if err != nil {
 		http.Error(w, "Failed to retrieve user courses: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// 3. Map domain models to response DTOs
-	var courseDTOs []dto.CourseResponseDTO
+	var courseDTOs []dto.UserCourseResponseDTO
 	for _, course := range courses {
-		courseDTOs = append(courseDTOs, dto.CourseResponseDTO{
+		courseDTOs = append(courseDTOs, dto.UserCourseResponseDTO{
 			CourseID:    course.CourseID,
 			Title:       course.Title,
 			Description: course.Description,
@@ -157,4 +158,59 @@ func (h *UserHandler) getUserCourses(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(courseDTOs)
+}
+
+func (h *UserHandler) getRecentLectures(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 1. Extract UserID from context
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: user ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Parse limit and offset from query parameters
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	limit := 10 // Default limit
+	if limitStr != "" {
+		l, err := strconv.Atoi(limitStr)
+		if err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	offset := 0 // Default offset
+	if offsetStr != "" {
+		o, err := strconv.Atoi(offsetStr)
+		if err == nil && o >= 0 {
+			offset = o
+		}
+	}
+
+	// 3. Call service to get recent lectures
+	lectures, err := h.userService.GetRecentLectures(r.Context(), userID, limit, offset)
+	if err != nil {
+		http.Error(w, "Failed to retrieve recent lectures: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Map domain models to response DTOs
+	var lectureDTOs []dto.UserRecentLectureResponseDTO
+	for _, lecture := range lectures {
+		lectureDTOs = append(lectureDTOs, dto.UserRecentLectureResponseDTO{
+			LectureID: lecture.ID,
+			Title:     lecture.Title,
+		})
+	}
+
+	// 5. Return response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(lectureDTOs)
 }

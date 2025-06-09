@@ -14,28 +14,32 @@ var (
 )
 
 type UserService interface {
-	CreateUser(ctx context.Context, u *model.User) (*model.User, error)
-	GetUser(ctx context.Context, id string) (*model.User, error)
+	Create(ctx context.Context, u *model.User) (*model.User, error)
+	Get(ctx context.Context, id string) (*model.User, error)
+	GetRecentLectures(ctx context.Context, userID string, limit, offset int) ([]model.Lecture, error)
+	GetCourses(ctx context.Context, userID string) ([]model.Course, error)
 }
 
 type userService struct {
-	repo repository.UserRepository
+	userRepo    repository.UserRepository
+	courseRepo  repository.CourseRepository
+	lectureRepo repository.LectureRepository
 }
 
-func NewUserService(repo repository.UserRepository) UserService {
-	return &userService{repo: repo}
+func NewUserService(userRepo repository.UserRepository, courseRepo repository.CourseRepository, lectureRepo repository.LectureRepository) UserService {
+	return &userService{userRepo: userRepo, courseRepo: courseRepo, lectureRepo: lectureRepo}
 }
 
-func (s *userService) CreateUser(ctx context.Context, u *model.User) (*model.User, error) {
-	err := s.repo.CreateUser(ctx, u)
+func (s *userService) Create(ctx context.Context, u *model.User) (*model.User, error) {
+	err := s.userRepo.CreateUser(ctx, u)
 	if err != nil {
 		return nil, err
 	}
 	return u, nil
 }
 
-func (s *userService) GetUser(ctx context.Context, id string) (*model.User, error) {
-	u, err := s.repo.GetUserByID(ctx, id)
+func (s *userService) Get(ctx context.Context, id string) (*model.User, error) {
+	u, err := s.userRepo.GetUserByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -43,4 +47,20 @@ func (s *userService) GetUser(ctx context.Context, id string) (*model.User, erro
 		return nil, ErrUserNotFound
 	}
 	return u, nil
+}
+
+func (s *userService) GetCourses(ctx context.Context, userID string) ([]model.Course, error) {
+	courses, err := s.courseRepo.GetCoursesByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return courses, nil
+}
+
+func (s *userService) GetRecentLectures(ctx context.Context, userID string, limit, offset int) ([]model.Lecture, error) {
+	lectures, err := s.lectureRepo.GetLecturesByUserID(ctx, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	return lectures, nil
 }
