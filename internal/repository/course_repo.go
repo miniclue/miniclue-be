@@ -1,0 +1,62 @@
+package repository
+
+import (
+	"context"
+	"database/sql"
+
+	"app/internal/model"
+)
+
+// CourseRepository defines the interface for interacting with course data
+type CourseRepository interface {
+	GetCoursesByUserID(ctx context.Context, userID string) ([]model.Course, error)
+}
+
+type courseRepo struct {
+	db *sql.DB
+}
+
+// NewCourseRepo creates a new CourseRepository
+func NewCourseRepo(db *sql.DB) CourseRepository {
+	return &courseRepo{db: db}
+}
+
+// GetCoursesByUserID retrieves all courses associated with a given user ID
+func (r *courseRepo) GetCoursesByUserID(ctx context.Context, userID string) ([]model.Course, error) {
+	var courses []model.Course
+	query := `
+		SELECT id, title, description
+		FROM courses
+		WHERE user_id = $1
+		ORDER BY title ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var course model.Course
+		if err := rows.Scan(
+			&course.CourseID,
+			&course.Title,
+			&course.Description,
+		); err != nil {
+			return nil, err
+		}
+		courses = append(courses, course)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// If no courses found, return an empty slice, not nil
+	if len(courses) == 0 {
+		return []model.Course{}, nil
+	}
+
+	return courses, nil
+}
