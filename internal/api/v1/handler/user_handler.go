@@ -43,6 +43,18 @@ func (h *UserHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// createUser godoc
+// @Summary Create a new user profile
+// @Description Creates a new user profile associated with the authenticated user ID.
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param user body dto.UserCreateDTO true "User creation request"
+// @Success 201 {object} dto.UserResponseDTO
+// @Failure 400 {string} string "Invalid JSON payload or validation failed"
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 500 {string} string "Failed to create user"
+// @Router /users/me [post]
 func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	// 1. Extract UserID from context
 	userId, ok := r.Context().Value(middleware.UserContextKey).(string)
@@ -95,6 +107,16 @@ func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// getUser godoc
+// @Summary Get user profile
+// @Description Retrieves the profile of the authenticated user.
+// @Tags users
+// @Produce json
+// @Success 200 {object} dto.UserResponseDTO
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "User not found"
+// @Failure 500 {string} string "Internal server error"
+// @Router /users/me [get]
 func (h *UserHandler) getUser(w http.ResponseWriter, r *http.Request) {
 	userId, ok := r.Context().Value(middleware.UserContextKey).(string)
 	if !ok {
@@ -124,6 +146,15 @@ func (h *UserHandler) getUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// getUserCourses godoc
+// @Summary Get user's courses
+// @Description Retrieves the list of courses associated with the authenticated user.
+// @Tags users
+// @Produce json
+// @Success 200 {array} dto.UserCourseResponseDTO
+// @Failure 401 {string} string "Unauthorized: user ID not found in context"
+// @Failure 500 {string} string "Failed to retrieve user courses"
+// @Router /users/me/courses [get]
 func (h *UserHandler) getUserCourses(w http.ResponseWriter, r *http.Request) {
 	// 1. Check method
 	if r.Method != http.MethodGet {
@@ -160,6 +191,17 @@ func (h *UserHandler) getUserCourses(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(courseDTOs)
 }
 
+// getRecentLectures godoc
+// @Summary Get recent lectures
+// @Description Retrieves a list of recently viewed lectures for the authenticated user.
+// @Tags users
+// @Produce json
+// @Param limit query int false "Number of lectures to return (default 10)"
+// @Param offset query int false "Offset for pagination (default 0)"
+// @Success 200 {array} model.Lecture
+// @Failure 401 {string} string "Unauthorized: user ID not found in context"
+// @Failure 500 {string} string "Failed to retrieve recent lectures"
+// @Router /users/me/recents [get]
 func (h *UserHandler) getRecentLectures(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)

@@ -72,6 +72,12 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	// Mount the API v1 routes under /api/v1
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiV1Mux))
 
+	// Add Swagger documentation
+	mux.HandleFunc("/swagger/swagger.json", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./docs/swagger/swagger.json")
+	})
+	mux.Handle("/swagger/", http.StripPrefix("/swagger/", http.FileServer(http.Dir("./docs/swagger/swagger-ui"))))
+
 	// Handle /api and all its subpaths
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		// Get the rest of the path after /api

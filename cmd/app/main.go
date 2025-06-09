@@ -15,6 +15,12 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// @title MiniClue API
+// @version 1.0
+// @description MiniClue API documentation
+// @host localhost:8080
+// @BasePath /api/v1
+
 func main() {
 	logger := logger.New()
 

@@ -9,3 +9,9 @@
 
 # Ignore Cursor rules
 .cursor/
+
+# Ignore swagger docs
+docs/swagger
+
+# Ignore bin
+bin
