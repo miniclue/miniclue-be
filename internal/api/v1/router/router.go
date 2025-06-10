@@ -57,8 +57,10 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	courseRepo := repository.NewCourseRepo(db)
 
 	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo)
+	courseSvc := service.NewCourseService(courseRepo)
 
 	userHandler := handler.NewUserHandler(userSvc, validate)
+	courseHandler := handler.NewCourseHandler(courseSvc, validate)
 
 	// 4. Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)
@@ -69,6 +71,7 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	// Create a subrouter for API v1 with the /api/v1 prefix
 	apiV1Mux := http.NewServeMux()
 	userHandler.RegisterRoutes(apiV1Mux, authMiddleware)
+	courseHandler.RegisterRoutes(apiV1Mux, authMiddleware)
 
 	// Mount the API v1 routes under /api/v1
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiV1Mux))

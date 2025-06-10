@@ -10,6 +10,7 @@ import (
 // CourseRepository defines the interface for interacting with course data
 type CourseRepository interface {
 	GetCoursesByUserID(ctx context.Context, userID string) ([]model.Course, error)
+	CreateCourse(ctx context.Context, c *model.Course) error
 }
 
 type courseRepo struct {
@@ -59,4 +60,15 @@ func (r *courseRepo) GetCoursesByUserID(ctx context.Context, userID string) ([]m
 	}
 
 	return courses, nil
+}
+
+// CreateCourse inserts a new course and returns the created record
+func (r *courseRepo) CreateCourse(ctx context.Context, c *model.Course) error {
+	query := `
+		INSERT INTO courses (user_id, title, description, is_default)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, user_id, title, description, is_default, created_at, updated_at
+	`
+	return r.db.QueryRowContext(ctx, query, c.UserID, c.Title, c.Description, c.IsDefault).
+		Scan(&c.CourseID, &c.UserID, &c.Title, &c.Description, &c.IsDefault, &c.CreatedAt, &c.UpdatedAt)
 }
