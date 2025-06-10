@@ -248,6 +248,7 @@ func (h *UserHandler) getRecentLectures(w http.ResponseWriter, r *http.Request) 
 		lectureDTOs = append(lectureDTOs, dto.UserRecentLectureResponseDTO{
 			LectureID: lecture.ID,
 			Title:     lecture.Title,
+			CourseID:  lecture.CourseID,
 		})
 	}
 

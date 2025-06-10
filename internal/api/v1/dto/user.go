@@ -28,4 +28,5 @@ type UserCourseResponseDTO struct {
 type UserRecentLectureResponseDTO struct {
 	LectureID string `json:"lecture_id"`
 	Title     string `json:"title"`
+	CourseID  string `json:"course_id"`
 }
