@@ -15,6 +15,8 @@ type CourseRepository interface {
 	GetCourseByID(ctx context.Context, courseID string) (*model.Course, error)
 	// UpdateCourse updates an existing course
 	UpdateCourse(ctx context.Context, c *model.Course) error
+	// DeleteCourse deletes a course by its ID
+	DeleteCourse(ctx context.Context, courseID string) error
 }
 
 type courseRepo struct {
@@ -113,4 +115,10 @@ func (r *courseRepo) UpdateCourse(ctx context.Context, c *model.Course) error {
 	`
 	return r.db.QueryRowContext(ctx, query, c.Title, c.Description, c.IsDefault, c.CourseID).
 		Scan(&c.UserID, &c.Title, &c.Description, &c.IsDefault, &c.CreatedAt, &c.UpdatedAt)
+}
+
+// DeleteCourse deletes a course and cascades to related records via DB ON DELETE CASCADE
+func (r *courseRepo) DeleteCourse(ctx context.Context, courseID string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM courses WHERE id = $1`, courseID)
+	return err
 }

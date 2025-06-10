@@ -14,6 +14,8 @@ type CourseService interface {
 	GetCourseByID(ctx context.Context, courseID string) (*model.Course, error)
 	// UpdateCourse updates an existing course
 	UpdateCourse(ctx context.Context, c *model.Course) (*model.Course, error)
+	// DeleteCourse deletes a course by its ID
+	DeleteCourse(ctx context.Context, courseID string) error
 }
 
 // courseService is the implementation of CourseService
@@ -46,4 +48,9 @@ func (s *courseService) UpdateCourse(ctx context.Context, c *model.Course) (*mod
 		return nil, err
 	}
 	return c, nil
+}
+
+// DeleteCourse deletes a course by its ID
+func (s *courseService) DeleteCourse(ctx context.Context, courseID string) error {
+	return s.repo.DeleteCourse(ctx, courseID)
 }

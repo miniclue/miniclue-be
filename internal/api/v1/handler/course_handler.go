@@ -201,6 +201,39 @@ func (h *CourseHandler) updateCourse(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// deleteCourse godoc
+// @Summary Delete a course
+// @Description Deletes an existing course by its ID and cascades deletion of related data.
+// @Tags courses
+// @Param courseId path string true "Course ID"
+// @Success 204 {string} string "No Content"
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "Course not found"
+// @Failure 500 {string} string "Failed to delete course"
+// @Router /courses/{courseId} [delete]
+func (h *CourseHandler) deleteCourse(w http.ResponseWriter, r *http.Request) {
+	courseID := strings.TrimPrefix(r.URL.Path, "/courses/")
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+	course, err := h.courseService.GetCourseByID(r.Context(), courseID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve course: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if course == nil || course.UserID != userID {
+		http.Error(w, "Course not found", http.StatusNotFound)
+		return
+	}
+	if err := h.courseService.DeleteCourse(r.Context(), courseID); err != nil {
+		http.Error(w, "Failed to delete course: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *CourseHandler) handleCourse(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, "/courses/") {
 		http.NotFound(w, r)
@@ -216,6 +249,8 @@ func (h *CourseHandler) handleCourse(w http.ResponseWriter, r *http.Request) {
 		h.getCourse(w, r)
 	case http.MethodPut:
 		h.updateCourse(w, r)
+	case http.MethodDelete:
+		h.deleteCourse(w, r)
 	default:
 		http.NotFound(w, r)
 	}
