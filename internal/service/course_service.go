@@ -12,6 +12,8 @@ type CourseService interface {
 	CreateCourse(ctx context.Context, c *model.Course) (*model.Course, error)
 	// GetCourseByID retrieves a course by its ID
 	GetCourseByID(ctx context.Context, courseID string) (*model.Course, error)
+	// UpdateCourse updates an existing course
+	UpdateCourse(ctx context.Context, c *model.Course) (*model.Course, error)
 }
 
 // courseService is the implementation of CourseService
@@ -36,4 +38,12 @@ func (s *courseService) CreateCourse(ctx context.Context, c *model.Course) (*mod
 // GetCourseByID retrieves a course by its ID
 func (s *courseService) GetCourseByID(ctx context.Context, courseID string) (*model.Course, error) {
 	return s.repo.GetCourseByID(ctx, courseID)
+}
+
+// UpdateCourse updates an existing course record
+func (s *courseService) UpdateCourse(ctx context.Context, c *model.Course) (*model.Course, error) {
+	if err := s.repo.UpdateCourse(ctx, c); err != nil {
+		return nil, err
+	}
+	return c, nil
 }

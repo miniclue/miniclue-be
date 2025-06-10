@@ -19,3 +19,10 @@ type CourseResponseDTO struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
+
+// CourseUpdateDTO is used for incoming course update requests
+type CourseUpdateDTO struct {
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+	IsDefault   *bool   `json:"is_default,omitempty"`
+}

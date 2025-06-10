@@ -26,7 +26,7 @@ func NewCourseHandler(courseService service.CourseService, validate *validator.V
 
 // RegisterRoutes mounts course routes
 func (h *CourseHandler) RegisterRoutes(mux *http.ServeMux, authMw func(http.Handler) http.Handler) {
-	mux.Handle("/courses", authMw(http.HandlerFunc(h.handleCourses)))
+	mux.Handle("/courses", authMw(http.HandlerFunc(h.createCourse)))
 	mux.Handle("/courses/", authMw(http.HandlerFunc(h.handleCourse)))
 }
 
@@ -42,7 +42,7 @@ func (h *CourseHandler) RegisterRoutes(mux *http.ServeMux, authMw func(http.Hand
 // @Failure 401 {string} string "Unauthorized: User ID not found in context"
 // @Failure 500 {string} string "Failed to create course"
 // @Router /courses [post]
-func (h *CourseHandler) handleCourses(w http.ResponseWriter, r *http.Request) {
+func (h *CourseHandler) createCourse(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost || r.URL.Path != "/courses" {
 		http.NotFound(w, r)
 		return
@@ -106,20 +106,13 @@ func (h *CourseHandler) handleCourses(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {string} string "Course not found"
 // @Failure 500 {string} string "Failed to retrieve course"
 // @Router /courses/{courseId} [get]
-func (h *CourseHandler) handleCourse(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet || !strings.HasPrefix(r.URL.Path, "/courses/") {
-		http.NotFound(w, r)
-		return
-	}
-	// extract course ID from path
+func (h *CourseHandler) getCourse(w http.ResponseWriter, r *http.Request) {
 	courseID := strings.TrimPrefix(r.URL.Path, "/courses/")
-	// auth
 	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
 	if !ok || userID == "" {
 		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
 		return
 	}
-	// fetch course
 	course, err := h.courseService.GetCourseByID(r.Context(), courseID)
 	if err != nil {
 		http.Error(w, "Failed to retrieve course: "+err.Error(), http.StatusInternalServerError)
@@ -129,7 +122,6 @@ func (h *CourseHandler) handleCourse(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Course not found", http.StatusNotFound)
 		return
 	}
-	// map to DTO and respond
 	resp := dto.CourseResponseDTO{
 		CourseID:    course.CourseID,
 		UserID:      course.UserID,
@@ -141,4 +133,90 @@ func (h *CourseHandler) handleCourse(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// updateCourse godoc
+// @Summary Update a course
+// @Description Updates an existing course by its ID.
+// @Tags courses
+// @Accept json
+// @Produce json
+// @Param courseId path string true "Course ID"
+// @Param course body dto.CourseUpdateDTO true "Course update request"
+// @Success 200 {object} dto.CourseResponseDTO
+// @Failure 400 {string} string "Invalid JSON payload or validation failed"
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "Course not found"
+// @Failure 500 {string} string "Failed to update course"
+// @Router /courses/{courseId} [put]
+func (h *CourseHandler) updateCourse(w http.ResponseWriter, r *http.Request) {
+	courseID := strings.TrimPrefix(r.URL.Path, "/courses/")
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+	var req dto.CourseUpdateDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := h.validate.Struct(&req); err != nil {
+		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	course, err := h.courseService.GetCourseByID(r.Context(), courseID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve course: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if course == nil || course.UserID != userID {
+		http.Error(w, "Course not found", http.StatusNotFound)
+		return
+	}
+	if req.Title != nil {
+		course.Title = *req.Title
+	}
+	if req.Description != nil {
+		course.Description = *req.Description
+	}
+	if req.IsDefault != nil {
+		course.IsDefault = *req.IsDefault
+	}
+	updated, err := h.courseService.UpdateCourse(r.Context(), course)
+	if err != nil {
+		http.Error(w, "Failed to update course: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resp := dto.CourseResponseDTO{
+		CourseID:    updated.CourseID,
+		UserID:      updated.UserID,
+		Title:       updated.Title,
+		Description: updated.Description,
+		IsDefault:   updated.IsDefault,
+		CreatedAt:   updated.CreatedAt,
+		UpdatedAt:   updated.UpdatedAt,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *CourseHandler) handleCourse(w http.ResponseWriter, r *http.Request) {
+	if !strings.HasPrefix(r.URL.Path, "/courses/") {
+		http.NotFound(w, r)
+		return
+	}
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		h.getCourse(w, r)
+	case http.MethodPut:
+		h.updateCourse(w, r)
+	default:
+		http.NotFound(w, r)
+	}
 }

@@ -13,6 +13,8 @@ type CourseRepository interface {
 	CreateCourse(ctx context.Context, c *model.Course) error
 	// GetCourseByID retrieves a course by its ID
 	GetCourseByID(ctx context.Context, courseID string) (*model.Course, error)
+	// UpdateCourse updates an existing course
+	UpdateCourse(ctx context.Context, c *model.Course) error
 }
 
 type courseRepo struct {
@@ -99,4 +101,16 @@ func (r *courseRepo) GetCourseByID(ctx context.Context, courseID string) (*model
 		return nil, err
 	}
 	return &c, nil
+}
+
+// UpdateCourse updates an existing course record and returns updated timestamps
+func (r *courseRepo) UpdateCourse(ctx context.Context, c *model.Course) error {
+	query := `
+		UPDATE courses
+		SET title = $1, description = $2, is_default = $3, updated_at = NOW()
+		WHERE id = $4
+		RETURNING user_id, title, description, is_default, created_at, updated_at
+	`
+	return r.db.QueryRowContext(ctx, query, c.Title, c.Description, c.IsDefault, c.CourseID).
+		Scan(&c.UserID, &c.Title, &c.Description, &c.IsDefault, &c.CreatedAt, &c.UpdatedAt)
 }
