@@ -28,7 +28,18 @@ func (h *CourseHandler) RegisterRoutes(mux *http.ServeMux, authMw func(http.Hand
 	mux.Handle("/courses", authMw(http.HandlerFunc(h.handleCourses)))
 }
 
-// handleCourses handles POST /courses
+// createCourse godoc
+// @Summary Create a new course
+// @Description Creates a new course associated with the authenticated user.
+// @Tags courses
+// @Accept json
+// @Produce json
+// @Param course body dto.CourseCreateDTO true "Course creation request"
+// @Success 201 {object} dto.CourseResponseDTO
+// @Failure 400 {string} string "Invalid JSON payload or validation failed"
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 500 {string} string "Failed to create course"
+// @Router /courses [post]
 func (h *CourseHandler) handleCourses(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost || r.URL.Path != "/courses" {
 		http.NotFound(w, r)
