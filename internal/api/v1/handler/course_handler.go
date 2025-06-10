@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"app/internal/api/v1/dto"
 	"app/internal/model"
@@ -26,6 +27,7 @@ func NewCourseHandler(courseService service.CourseService, validate *validator.V
 // RegisterRoutes mounts course routes
 func (h *CourseHandler) RegisterRoutes(mux *http.ServeMux, authMw func(http.Handler) http.Handler) {
 	mux.Handle("/courses", authMw(http.HandlerFunc(h.handleCourses)))
+	mux.Handle("/courses/", authMw(http.HandlerFunc(h.handleCourse)))
 }
 
 // createCourse godoc
@@ -90,5 +92,53 @@ func (h *CourseHandler) handleCourses(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(resp)
+}
+
+// getCourseByID godoc
+// @Summary Get a course
+// @Description Retrieves a course by its ID.
+// @Tags courses
+// @Produce json
+// @Param courseId path string true "Course ID"
+// @Success 200 {object} dto.CourseResponseDTO
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "Course not found"
+// @Failure 500 {string} string "Failed to retrieve course"
+// @Router /courses/{courseId} [get]
+func (h *CourseHandler) handleCourse(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet || !strings.HasPrefix(r.URL.Path, "/courses/") {
+		http.NotFound(w, r)
+		return
+	}
+	// extract course ID from path
+	courseID := strings.TrimPrefix(r.URL.Path, "/courses/")
+	// auth
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+	// fetch course
+	course, err := h.courseService.GetCourseByID(r.Context(), courseID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve course: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if course == nil || course.UserID != userID {
+		http.Error(w, "Course not found", http.StatusNotFound)
+		return
+	}
+	// map to DTO and respond
+	resp := dto.CourseResponseDTO{
+		CourseID:    course.CourseID,
+		UserID:      course.UserID,
+		Title:       course.Title,
+		Description: course.Description,
+		IsDefault:   course.IsDefault,
+		CreatedAt:   course.CreatedAt,
+		UpdatedAt:   course.UpdatedAt,
+	}
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }

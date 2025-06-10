@@ -10,6 +10,8 @@ import (
 // CourseService defines the interface for course operations
 type CourseService interface {
 	CreateCourse(ctx context.Context, c *model.Course) (*model.Course, error)
+	// GetCourseByID retrieves a course by its ID
+	GetCourseByID(ctx context.Context, courseID string) (*model.Course, error)
 }
 
 // courseService is the implementation of CourseService
@@ -29,4 +31,9 @@ func (s *courseService) CreateCourse(ctx context.Context, c *model.Course) (*mod
 		return nil, err
 	}
 	return c, nil
+}
+
+// GetCourseByID retrieves a course by its ID
+func (s *courseService) GetCourseByID(ctx context.Context, courseID string) (*model.Course, error) {
+	return s.repo.GetCourseByID(ctx, courseID)
 }

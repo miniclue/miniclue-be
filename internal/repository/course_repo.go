@@ -11,6 +11,8 @@ import (
 type CourseRepository interface {
 	GetCoursesByUserID(ctx context.Context, userID string) ([]model.Course, error)
 	CreateCourse(ctx context.Context, c *model.Course) error
+	// GetCourseByID retrieves a course by its ID
+	GetCourseByID(ctx context.Context, courseID string) (*model.Course, error)
 }
 
 type courseRepo struct {
@@ -71,4 +73,30 @@ func (r *courseRepo) CreateCourse(ctx context.Context, c *model.Course) error {
 	`
 	return r.db.QueryRowContext(ctx, query, c.UserID, c.Title, c.Description, c.IsDefault).
 		Scan(&c.CourseID, &c.UserID, &c.Title, &c.Description, &c.IsDefault, &c.CreatedAt, &c.UpdatedAt)
+}
+
+// GetCourseByID retrieves a course by its ID
+func (r *courseRepo) GetCourseByID(ctx context.Context, courseID string) (*model.Course, error) {
+	query := `
+		SELECT id, user_id, title, description, is_default, created_at, updated_at
+		FROM courses
+		WHERE id = $1
+	`
+	var c model.Course
+	err := r.db.QueryRowContext(ctx, query, courseID).Scan(
+		&c.CourseID,
+		&c.UserID,
+		&c.Title,
+		&c.Description,
+		&c.IsDefault,
+		&c.CreatedAt,
+		&c.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &c, nil
 }
