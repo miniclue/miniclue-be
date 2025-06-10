@@ -21,8 +21,7 @@ func NewUserRepo(db *sql.DB) UserRepository {
 }
 
 func (r *userRepo) CreateUser(ctx context.Context, u *model.User) error {
-	query := `INSERT INTO user_profiles (user_id, name, email, avatar_url)
-              VALUES ($1, $2, $3, $4) RETURNING user_id, name, email, avatar_url, created_at, updated_at`
+	query := `INSERT INTO user_profiles (user_id, name, email, avatar_url) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, avatar_url = EXCLUDED.avatar_url, updated_at = NOW() RETURNING user_id, name, email, avatar_url, created_at, updated_at;`
 	err := r.db.QueryRowContext(ctx, query, u.UserID, u.Name, u.Email, u.AvatarURL).Scan(&u.UserID, &u.Name, &u.Email, &u.AvatarURL, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return err

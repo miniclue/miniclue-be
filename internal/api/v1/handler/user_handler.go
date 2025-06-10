@@ -44,8 +44,8 @@ func (h *UserHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 // createUser godoc
-// @Summary Create a new user profile
-// @Description Creates a new user profile associated with the authenticated user ID.
+// @Summary Create or update a user profile
+// @Description Creates a new user profile or updates an existing one associated with the authenticated user ID.
 // @Tags users
 // @Accept json
 // @Produce json
