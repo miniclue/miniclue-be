@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"app/internal/api/v1/dto"
@@ -15,13 +16,18 @@ import (
 
 // CourseHandler handles course-related endpoints
 type CourseHandler struct {
-	courseService service.CourseService
-	validate      *validator.Validate
+	courseService  service.CourseService
+	lectureService service.LectureService
+	validate       *validator.Validate
 }
 
 // NewCourseHandler creates a new CourseHandler
-func NewCourseHandler(courseService service.CourseService, validate *validator.Validate) *CourseHandler {
-	return &CourseHandler{courseService: courseService, validate: validate}
+func NewCourseHandler(courseService service.CourseService, lectureService service.LectureService, validate *validator.Validate) *CourseHandler {
+	return &CourseHandler{
+		courseService:  courseService,
+		lectureService: lectureService,
+		validate:       validate,
+	}
 }
 
 // RegisterRoutes mounts course routes
@@ -93,6 +99,34 @@ func (h *CourseHandler) createCourse(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *CourseHandler) handleCourse(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	if !strings.HasPrefix(path, "/courses/") {
+		http.NotFound(w, r)
+		return
+	}
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+	// GET /courses/{courseId}/lectures
+	if r.Method == http.MethodGet && strings.HasSuffix(path, "/lectures") {
+		h.getCourseLectures(w, r)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		h.getCourse(w, r)
+	case http.MethodPut:
+		h.updateCourse(w, r)
+	case http.MethodDelete:
+		h.deleteCourse(w, r)
+	default:
+		http.NotFound(w, r)
+	}
 }
 
 // getCourseByID godoc
@@ -236,24 +270,64 @@ func (h *CourseHandler) deleteCourse(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *CourseHandler) handleCourse(w http.ResponseWriter, r *http.Request) {
-	if !strings.HasPrefix(r.URL.Path, "/courses/") {
-		http.NotFound(w, r)
-		return
-	}
+// getCourseLectures godoc
+// @Summary Get lectures of a course
+// @Description Retrieves lectures under a course by ID, supports limit & offset
+// @Tags courses
+// @Produce json
+// @Param courseId path string true "Course ID"
+// @Param limit query int false "Number of lectures to return (default 10)"
+// @Param offset query int false "Offset for pagination (default 0)"
+// @Success 200 {array} dto.CourseLectureResponseDTO
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "Course not found"
+// @Failure 500 {string} string "Failed to retrieve lectures"
+// @Router /courses/{courseId}/lectures [get]
+func (h *CourseHandler) getCourseLectures(w http.ResponseWriter, r *http.Request) {
+	// Auth
 	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
 	if !ok || userID == "" {
 		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
 		return
 	}
-	switch r.Method {
-	case http.MethodGet:
-		h.getCourse(w, r)
-	case http.MethodPut:
-		h.updateCourse(w, r)
-	case http.MethodDelete:
-		h.deleteCourse(w, r)
-	default:
-		http.NotFound(w, r)
+	// Extract courseId
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/courses/"), "/")
+	courseID := parts[0]
+	// Verify ownership
+	course, err := h.courseService.GetCourseByID(r.Context(), courseID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve course: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
+	if course == nil || course.UserID != userID {
+		http.Error(w, "Course not found", http.StatusNotFound)
+		return
+	}
+	// Parse pagination
+	query := r.URL.Query()
+	limit := 10
+	if l := query.Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	offset := 0
+	if o := query.Get("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+	// Fetch lectures
+	lectures, err := h.lectureService.GetLecturesByCourseID(r.Context(), courseID, limit, offset)
+	if err != nil {
+		http.Error(w, "Failed to retrieve lectures: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Map to DTO
+	var dtos []dto.CourseLectureResponseDTO
+	for _, lec := range lectures {
+		dtos = append(dtos, dto.CourseLectureResponseDTO{LectureID: lec.ID, Title: lec.Title})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(dtos)
 }

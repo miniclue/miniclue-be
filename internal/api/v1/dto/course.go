@@ -26,3 +26,14 @@ type CourseUpdateDTO struct {
 	Description *string `json:"description,omitempty"`
 	IsDefault   *bool   `json:"is_default,omitempty"`
 }
+
+// CourseLectureResponseDTO is returned for lectures under a course
+// @Summary Lecture info under a course
+// @Tags courses
+// @Produce json
+// @Success 200 {array} dto.CourseLectureResponseDTO
+// @Router /courses/{courseId}/lectures [get]
+type CourseLectureResponseDTO struct {
+    LectureID string `json:"lecture_id"`
+    Title     string `json:"title"`
+}
