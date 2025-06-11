@@ -13,6 +13,7 @@ type LectureService interface {
 	GetLecturesByCourseID(ctx context.Context, courseID string, limit, offset int) ([]model.Lecture, error)
 	GetLectureByID(ctx context.Context, lectureID string) (*model.Lecture, error)
 	DeleteLecture(ctx context.Context, lectureID string) error
+	UpdateLecture(ctx context.Context, l *model.Lecture) error
 }
 
 // lectureService is the implementation of LectureService
@@ -38,4 +39,9 @@ func (s *lectureService) GetLectureByID(ctx context.Context, lectureID string) (
 // DeleteLecture removes a lecture by ID
 func (s *lectureService) DeleteLecture(ctx context.Context, lectureID string) error {
 	return s.repo.DeleteLecture(ctx, lectureID)
+}
+
+// UpdateLecture applies title and accessed_at changes to a lecture
+func (s *lectureService) UpdateLecture(ctx context.Context, l *model.Lecture) error {
+	return s.repo.UpdateLecture(ctx, l)
 }

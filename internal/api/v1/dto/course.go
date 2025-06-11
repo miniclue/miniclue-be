@@ -54,3 +54,9 @@ type LectureResponseDTO struct {
     UpdatedAt  time.Time `json:"updated_at"`
     AccessedAt time.Time `json:"accessed_at"`
 }
+
+// LectureUpdateDTO is used for incoming lecture update requests
+type LectureUpdateDTO struct {
+    Title      *string    `json:"title,omitempty"`
+    AccessedAt *time.Time `json:"accessed_at,omitempty"`
+}
