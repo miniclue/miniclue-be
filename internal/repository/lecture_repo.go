@@ -12,6 +12,7 @@ type LectureRepository interface {
 	GetLecturesByUserID(ctx context.Context, userID string, limit, offset int) ([]model.Lecture, error)
 	GetLecturesByCourseID(ctx context.Context, courseID string, limit, offset int) ([]model.Lecture, error)
 	GetLectureByID(ctx context.Context, lectureID string) (*model.Lecture, error)
+	DeleteLecture(ctx context.Context, lectureID string) error
 }
 
 type lectureRepository struct {
@@ -129,4 +130,12 @@ func (r *lectureRepository) GetLectureByID(ctx context.Context, lectureID string
 		return nil, fmt.Errorf("failed to scan lecture row: %w", err)
 	}
 	return &lecture, nil
+}
+
+func (r *lectureRepository) DeleteLecture(ctx context.Context, lectureID string) error {
+	query := `DELETE FROM lectures WHERE id = $1`
+	if _, err := r.db.ExecContext(ctx, query, lectureID); err != nil {
+		return fmt.Errorf("failed to delete lecture: %w", err)
+	}
+	return nil
 }

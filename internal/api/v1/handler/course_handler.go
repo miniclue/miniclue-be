@@ -117,6 +117,11 @@ func (h *CourseHandler) handleCourse(w http.ResponseWriter, r *http.Request) {
 		h.getCourseLecture(w, r)
 		return
 	}
+	// DELETE /courses/{courseId}/lectures/{lectureId}
+	if r.Method == http.MethodDelete && strings.Contains(path, "/lectures/") {
+		h.deleteCourseLecture(w, r)
+		return
+	}
 	// GET /courses/{courseId}/lectures
 	if r.Method == http.MethodGet && strings.HasSuffix(path, "/lectures") {
 		h.getCourseLectures(w, r)
@@ -393,4 +398,55 @@ func (h *CourseHandler) getCourseLecture(w http.ResponseWriter, r *http.Request)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// deleteCourseLecture godoc
+// @Summary Delete a lecture
+// @Description Deletes a lecture and all its derived data under a course.
+// @Tags courses
+// @Produce json
+// @Param courseId path string true "Course ID"
+// @Param lectureId path string true "Lecture ID"
+// @Success 204 {string} string "No Content"
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "Course not found or Lecture not found"
+// @Failure 500 {string} string "Failed to delete lecture"
+// @Router /courses/{courseId}/lectures/{lectureId} [delete]
+func (h *CourseHandler) deleteCourseLecture(w http.ResponseWriter, r *http.Request) {
+	// Auth
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+	// Extract courseId and lectureId
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/courses/"), "/")
+	courseID := parts[0]
+	lectureID := parts[2]
+	// Verify ownership
+	course, err := h.courseService.GetCourseByID(r.Context(), courseID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve course: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if course == nil || course.UserID != userID {
+		http.Error(w, "Course not found", http.StatusNotFound)
+		return
+	}
+	// Verify lecture exists and belongs to course
+	lecture, err := h.lectureService.GetLectureByID(r.Context(), lectureID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve lecture: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if lecture == nil || lecture.CourseID != courseID {
+		http.Error(w, "Lecture not found", http.StatusNotFound)
+		return
+	}
+	// Delete lecture (cascades related data)
+	if err := h.lectureService.DeleteLecture(r.Context(), lectureID); err != nil {
+		http.Error(w, "Failed to delete lecture: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

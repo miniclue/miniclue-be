@@ -12,6 +12,7 @@ import (
 type LectureService interface {
 	GetLecturesByCourseID(ctx context.Context, courseID string, limit, offset int) ([]model.Lecture, error)
 	GetLectureByID(ctx context.Context, lectureID string) (*model.Lecture, error)
+	DeleteLecture(ctx context.Context, lectureID string) error
 }
 
 // lectureService is the implementation of LectureService
@@ -32,4 +33,9 @@ func (s *lectureService) GetLecturesByCourseID(ctx context.Context, courseID str
 // GetLectureByID retrieves a lecture by ID
 func (s *lectureService) GetLectureByID(ctx context.Context, lectureID string) (*model.Lecture, error) {
 	return s.repo.GetLectureByID(ctx, lectureID)
+}
+
+// DeleteLecture removes a lecture by ID
+func (s *lectureService) DeleteLecture(ctx context.Context, lectureID string) error {
+	return s.repo.DeleteLecture(ctx, lectureID)
 }
