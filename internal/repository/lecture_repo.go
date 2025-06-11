@@ -11,6 +11,7 @@ import (
 type LectureRepository interface {
 	GetLecturesByUserID(ctx context.Context, userID string, limit, offset int) ([]model.Lecture, error)
 	GetLecturesByCourseID(ctx context.Context, courseID string, limit, offset int) ([]model.Lecture, error)
+	GetLectureByID(ctx context.Context, lectureID string) (*model.Lecture, error)
 }
 
 type lectureRepository struct {
@@ -101,4 +102,31 @@ func (r *lectureRepository) GetLecturesByCourseID(ctx context.Context, courseID 
 	}
 
 	return lectures, nil
+}
+
+func (r *lectureRepository) GetLectureByID(ctx context.Context, lectureID string) (*model.Lecture, error) {
+	query := `
+		SELECT id, user_id, course_id, title, pdf_url, status, created_at, updated_at, accessed_at
+		FROM lectures
+		WHERE id = $1
+	`
+	row := r.db.QueryRowContext(ctx, query, lectureID)
+	var lecture model.Lecture
+	if err := row.Scan(
+		&lecture.ID,
+		&lecture.UserID,
+		&lecture.CourseID,
+		&lecture.Title,
+		&lecture.PDFURL,
+		&lecture.Status,
+		&lecture.CreatedAt,
+		&lecture.UpdatedAt,
+		&lecture.AccessedAt,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to scan lecture row: %w", err)
+	}
+	return &lecture, nil
 }

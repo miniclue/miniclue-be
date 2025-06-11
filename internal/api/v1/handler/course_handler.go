@@ -112,6 +112,11 @@ func (h *CourseHandler) handleCourse(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
 		return
 	}
+	// GET /courses/{courseId}/lectures/{lectureId}
+	if r.Method == http.MethodGet && strings.Contains(path, "/lectures/") {
+		h.getCourseLecture(w, r)
+		return
+	}
 	// GET /courses/{courseId}/lectures
 	if r.Method == http.MethodGet && strings.HasSuffix(path, "/lectures") {
 		h.getCourseLectures(w, r)
@@ -330,4 +335,62 @@ func (h *CourseHandler) getCourseLectures(w http.ResponseWriter, r *http.Request
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(dtos)
+}
+
+// getCourseLecture godoc
+// @Summary Get a lecture
+// @Description Retrieves a lecture under a course by its IDs.
+// @Tags courses
+// @Produce json
+// @Param courseId path string true "Course ID"
+// @Param lectureId path string true "Lecture ID"
+// @Success 200 {object} dto.LectureResponseDTO
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "Course not found or Lecture not found"
+// @Failure 500 {string} string "Failed to retrieve lecture"
+// @Router /courses/{courseId}/lectures/{lectureId} [get]
+func (h *CourseHandler) getCourseLecture(w http.ResponseWriter, r *http.Request) {
+	// Auth
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+	// Extract courseId and lectureId
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/courses/"), "/")
+	courseID := parts[0]
+	lectureID := parts[2]
+	// Verify ownership
+	course, err := h.courseService.GetCourseByID(r.Context(), courseID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve course: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if course == nil || course.UserID != userID {
+		http.Error(w, "Course not found", http.StatusNotFound)
+		return
+	}
+	// Fetch lecture
+	lecture, err := h.lectureService.GetLectureByID(r.Context(), lectureID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve lecture: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if lecture == nil || lecture.CourseID != courseID {
+		http.Error(w, "Lecture not found", http.StatusNotFound)
+		return
+	}
+	// Map to DTO for single lecture
+	resp := dto.LectureResponseDTO{
+		LectureID:  lecture.ID,
+		CourseID:   lecture.CourseID,
+		Title:      lecture.Title,
+		PdfURL:     lecture.PDFURL,
+		Status:     lecture.Status,
+		CreatedAt:  lecture.CreatedAt,
+		UpdatedAt:  lecture.UpdatedAt,
+		AccessedAt: lecture.AccessedAt,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }

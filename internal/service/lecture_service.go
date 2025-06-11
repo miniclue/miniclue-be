@@ -11,6 +11,7 @@ import (
 // GetLecturesByCourseID retrieves lectures for a given course with pagination
 type LectureService interface {
 	GetLecturesByCourseID(ctx context.Context, courseID string, limit, offset int) ([]model.Lecture, error)
+	GetLectureByID(ctx context.Context, lectureID string) (*model.Lecture, error)
 }
 
 // lectureService is the implementation of LectureService
@@ -26,4 +27,9 @@ func NewLectureService(repo repository.LectureRepository) LectureService {
 // GetLecturesByCourseID retrieves lectures for a given course with pagination
 func (s *lectureService) GetLecturesByCourseID(ctx context.Context, courseID string, limit, offset int) ([]model.Lecture, error) {
 	return s.repo.GetLecturesByCourseID(ctx, courseID, limit, offset)
+}
+
+// GetLectureByID retrieves a lecture by ID
+func (s *lectureService) GetLectureByID(ctx context.Context, lectureID string) (*model.Lecture, error) {
+	return s.repo.GetLectureByID(ctx, lectureID)
 }
