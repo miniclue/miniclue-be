@@ -8,23 +8,29 @@ import (
 )
 
 // NoteService defines note-related operations
-// GetNotesByLectureID retrieves notes for a given lecture with pagination
-// returns empty slice if none exist
- type NoteService interface {
+type NoteService interface {
+	// GetNotesByLectureID retrieves notes for a given lecture with pagination
 	GetNotesByLectureID(ctx context.Context, lectureID string, limit, offset int) ([]model.Note, error)
+	// UpdateNoteByLectureID updates a note's content by lecture and returns the updated note
+	UpdateNoteByLectureID(ctx context.Context, lectureID string, content string) (*model.Note, error)
 }
 
 // noteService is the implementation of NoteService
- type noteService struct {
+type noteService struct {
 	repo repository.NoteRepository
 }
 
 // NewNoteService creates a new NoteService
- func NewNoteService(repo repository.NoteRepository) NoteService {
+func NewNoteService(repo repository.NoteRepository) NoteService {
 	return &noteService{repo: repo}
 }
 
 // GetNotesByLectureID retrieves notes for a given lecture with pagination
- func (s *noteService) GetNotesByLectureID(ctx context.Context, lectureID string, limit, offset int) ([]model.Note, error) {
+func (s *noteService) GetNotesByLectureID(ctx context.Context, lectureID string, limit, offset int) ([]model.Note, error) {
 	return s.repo.GetNotesByLectureID(ctx, lectureID, limit, offset)
+}
+
+// UpdateNoteByLectureID updates a note's content by lecture and returns updated note
+func (s *noteService) UpdateNoteByLectureID(ctx context.Context, lectureID string, content string) (*model.Note, error) {
+	return s.repo.UpdateNoteByLectureID(ctx, lectureID, content)
 }

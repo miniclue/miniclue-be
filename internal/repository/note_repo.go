@@ -9,24 +9,25 @@ import (
 )
 
 // NoteRepository defines note-related DB operations
-// GetNotesByLectureID retrieves note records for a given lecture with pagination
-// returns empty slice if none exist
- type NoteRepository interface {
+type NoteRepository interface {
+	// GetNotesByLectureID retrieves note records for a given lecture with pagination
 	GetNotesByLectureID(ctx context.Context, lectureID string, limit, offset int) ([]model.Note, error)
+	// UpdateNoteByLectureID updates a note's content for the given lecture and returns the updated note
+	UpdateNoteByLectureID(ctx context.Context, lectureID string, content string) (*model.Note, error)
 }
 
 // noteRepository is the DB implementation of NoteRepository
- type noteRepository struct {
+type noteRepository struct {
 	db *sql.DB
 }
 
 // NewNoteRepository creates a new NoteRepository
- func NewNoteRepository(db *sql.DB) NoteRepository {
+func NewNoteRepository(db *sql.DB) NoteRepository {
 	return &noteRepository{db: db}
 }
 
 // GetNotesByLectureID retrieves note records for a given lecture with pagination
- func (r *noteRepository) GetNotesByLectureID(ctx context.Context, lectureID string, limit, offset int) ([]model.Note, error) {
+func (r *noteRepository) GetNotesByLectureID(ctx context.Context, lectureID string, limit, offset int) ([]model.Note, error) {
 	query := `SELECT id, lecture_id, content, created_at, updated_at FROM notes WHERE lecture_id = $1 ORDER BY created_at LIMIT $2 OFFSET $3`
 	rows, err := r.db.QueryContext(ctx, query, lectureID, limit, offset)
 	if err != nil {
@@ -46,4 +47,15 @@ import (
 		return nil, fmt.Errorf("rows error: %w", err)
 	}
 	return notes, nil
+}
+
+// UpdateNoteByLectureID updates a note's content and returns updated record
+func (r *noteRepository) UpdateNoteByLectureID(ctx context.Context, lectureID string, content string) (*model.Note, error) {
+	query := `UPDATE notes SET content = $1, updated_at = NOW() WHERE lecture_id = $2 RETURNING id, user_id, lecture_id, content, created_at, updated_at`
+	row := r.db.QueryRowContext(ctx, query, content, lectureID)
+	var n model.Note
+	if err := row.Scan(&n.ID, &n.UserID, &n.LectureID, &n.Content, &n.CreatedAt, &n.UpdatedAt); err != nil {
+		return nil, fmt.Errorf("failed to update note: %w", err)
+	}
+	return &n, nil
 }

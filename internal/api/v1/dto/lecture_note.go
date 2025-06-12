@@ -15,3 +15,15 @@ type LectureNoteResponseDTO struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+// LectureNoteUpdateDTO represents payload to update a note's content
+// @Summary Lecture note update
+// @Tags lectures
+// @Accept json
+// @Produce json
+// @Param lectureId path string true "Lecture ID"
+// @Param noteId path string true "Note ID"
+// @Param note body LectureNoteUpdateDTO true "Note update data"
+type LectureNoteUpdateDTO struct {
+	Content string `json:"content" validate:"required"`
+}
