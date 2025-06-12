@@ -16,3 +16,17 @@ type LectureExplanationResponseDTO struct {
     CreatedAt   time.Time `json:"created_at"`
     UpdatedAt   time.Time `json:"updated_at"`
 }
+
+// LectureExplanationCreateDTO represents payload to create an explanation for a specific lecture
+// @Summary Create lecture explanation
+// @Tags lectures
+// @Accept json
+// @Produce json
+// @Param lectureId path string true "Lecture ID"
+// @Param explanation body LectureExplanationCreateDTO true "Explanation create data"
+// @Success 201 {object} dto.LectureExplanationResponseDTO
+// @Router /lectures/{lectureId}/explanations [post]
+type LectureExplanationCreateDTO struct {
+	SlideNumber int    `json:"slide_number" validate:"required"`
+	Content     string `json:"content" validate:"required"`
+}
