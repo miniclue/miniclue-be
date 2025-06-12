@@ -27,3 +27,16 @@ type LectureNoteResponseDTO struct {
 type LectureNoteUpdateDTO struct {
 	Content string `json:"content" validate:"required"`
 }
+
+// LectureNoteCreateDTO represents payload to create a note for a specific lecture
+// @Summary Create lecture note
+// @Tags lectures
+// @Accept json
+// @Produce json
+// @Param lectureId path string true "Lecture ID"
+// @Param note body LectureNoteCreateDTO true "Note create data"
+// @Success 201 {object} dto.LectureNoteResponseDTO
+// @Router /lectures/{lectureId}/notes [post]
+type LectureNoteCreateDTO struct {
+	Content string `json:"content" validate:"required"`
+}

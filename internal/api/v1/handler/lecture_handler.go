@@ -76,6 +76,11 @@ func (h *LectureHandler) handleLecture(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.updateLecture(w, r)
+	case http.MethodPost:
+		if strings.HasSuffix(path, "/notes") {
+			h.createLectureNote(w, r)
+			return
+		}
 	case http.MethodDelete:
 		h.deleteLecture(w, r)
 	default:
@@ -548,5 +553,76 @@ func (h *LectureHandler) updateLectureNote(w http.ResponseWriter, r *http.Reques
 		UpdatedAt: updated.UpdatedAt,
 	}
 	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// createLectureNote godoc
+// @Summary Create a lecture note
+// @Description Creates a new note for a lecture.
+// @Tags lectures
+// @Accept json
+// @Produce json
+// @Param lectureId path string true "Lecture ID"
+// @Param note body dto.LectureNoteCreateDTO true "Note create data"
+// @Success 201 {object} dto.LectureNoteResponseDTO
+// @Failure 400 {string} string "Invalid JSON payload or validation failed"
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "Lecture not found"
+// @Failure 500 {string} string "Failed to create note"
+// @Router /lectures/{lectureId}/notes [post]
+func (h *LectureHandler) createLectureNote(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+	lectureID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/lectures/"), "/notes")
+	lecture, err := h.lectureService.GetLectureByID(r.Context(), lectureID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve lecture: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if lecture == nil {
+		http.Error(w, "Lecture not found", http.StatusNotFound)
+		return
+	}
+	course, err := h.courseService.GetCourseByID(r.Context(), lecture.CourseID)
+	if err != nil || course == nil || course.UserID != userID {
+		http.Error(w, "Lecture not found", http.StatusNotFound)
+		return
+	}
+	// Prevent duplicate note for this lecture and user
+	existing, err := h.noteService.GetNoteByLectureIDAndUserID(r.Context(), lectureID, userID)
+	if err != nil {
+		http.Error(w, "Failed to check existing note: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if existing != nil {
+		http.Error(w, "Note already exists for this lecture", http.StatusConflict)
+		return
+	}
+	var req dto.LectureNoteCreateDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := h.validate.Struct(&req); err != nil {
+		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	created, err := h.noteService.CreateNoteByLectureID(r.Context(), userID, lectureID, req.Content)
+	if err != nil {
+		http.Error(w, "Failed to create note: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resp := dto.LectureNoteResponseDTO{
+		ID:        created.ID,
+		LectureID: created.LectureID,
+		Content:   created.Content,
+		CreatedAt: created.CreatedAt,
+		UpdatedAt: created.UpdatedAt,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(resp)
 }

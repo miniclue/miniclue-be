@@ -14,6 +14,10 @@ type NoteRepository interface {
 	GetNotesByLectureID(ctx context.Context, lectureID string, limit, offset int) ([]model.Note, error)
 	// UpdateNoteByLectureID updates a note's content for the given lecture and returns the updated note
 	UpdateNoteByLectureID(ctx context.Context, lectureID string, content string) (*model.Note, error)
+	// CreateNoteByLectureID creates a note for the given lecture and returns the created note
+	CreateNoteByLectureID(ctx context.Context, userID string, lectureID string, content string) (*model.Note, error)
+	// GetNoteByLectureIDAndUserID retrieves a note for a given lecture and user
+	GetNoteByLectureIDAndUserID(ctx context.Context, lectureID string, userID string) (*model.Note, error)
 }
 
 // noteRepository is the DB implementation of NoteRepository
@@ -56,6 +60,31 @@ func (r *noteRepository) UpdateNoteByLectureID(ctx context.Context, lectureID st
 	var n model.Note
 	if err := row.Scan(&n.ID, &n.UserID, &n.LectureID, &n.Content, &n.CreatedAt, &n.UpdatedAt); err != nil {
 		return nil, fmt.Errorf("failed to update note: %w", err)
+	}
+	return &n, nil
+}
+
+// CreateNoteByLectureID creates a note record for the given lecture and returns the created note
+func (r *noteRepository) CreateNoteByLectureID(ctx context.Context, userID string, lectureID string, content string) (*model.Note, error) {
+	query := `INSERT INTO notes (user_id, lecture_id, content) VALUES ($1, $2, $3) RETURNING id, user_id, lecture_id, content, created_at, updated_at`
+	row := r.db.QueryRowContext(ctx, query, userID, lectureID, content)
+	var n model.Note
+	if err := row.Scan(&n.ID, &n.UserID, &n.LectureID, &n.Content, &n.CreatedAt, &n.UpdatedAt); err != nil {
+		return nil, fmt.Errorf("failed to create note: %w", err)
+	}
+	return &n, nil
+}
+
+// GetNoteByLectureIDAndUserID retrieves a note for a given lecture and user
+func (r *noteRepository) GetNoteByLectureIDAndUserID(ctx context.Context, lectureID string, userID string) (*model.Note, error) {
+	query := `SELECT id, user_id, lecture_id, content, created_at, updated_at FROM notes WHERE lecture_id = $1 AND user_id = $2`
+	row := r.db.QueryRowContext(ctx, query, lectureID, userID)
+	var n model.Note
+	if err := row.Scan(&n.ID, &n.UserID, &n.LectureID, &n.Content, &n.CreatedAt, &n.UpdatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to query existing note: %w", err)
 	}
 	return &n, nil
 }
