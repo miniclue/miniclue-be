@@ -16,24 +16,27 @@ import (
 // LectureHandler handles flat lecture endpoints
 
 type LectureHandler struct {
-	lectureService service.LectureService
-	courseService  service.CourseService
-	summaryService service.SummaryService
-	validate       *validator.Validate
+	lectureService     service.LectureService
+	courseService      service.CourseService
+	summaryService     service.SummaryService
+	explanationService service.ExplanationService
+	validate           *validator.Validate
 }
 
 // NewLectureHandler creates a new LectureHandler
 func NewLectureHandler(
-	lectureService service.LectureService,
-	courseService service.CourseService,
-	summaryService service.SummaryService,
-	validate *validator.Validate,
+	lectureService     service.LectureService,
+	courseService      service.CourseService,
+	summaryService     service.SummaryService,
+	explanationService service.ExplanationService,
+	validate           *validator.Validate,
 ) *LectureHandler {
 	return &LectureHandler{
-		lectureService: lectureService,
-		courseService:  courseService,
-		summaryService: summaryService,
-		validate:       validate,
+		lectureService:     lectureService,
+		courseService:      courseService,
+		summaryService:     summaryService,
+		explanationService: explanationService,
+		validate:           validate,
 	}
 }
 
@@ -53,6 +56,10 @@ func (h *LectureHandler) handleLecture(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		if strings.HasSuffix(path, "/summary") {
 			h.getLectureSummary(w, r)
+			return
+		}
+		if strings.HasSuffix(path, "/explanations") {
+			h.listLectureExplanations(w, r)
 			return
 		}
 		h.getLecture(w, r)
@@ -328,6 +335,77 @@ func (h *LectureHandler) getLectureSummary(w http.ResponseWriter, r *http.Reques
 		content = summary.Content
 	}
 	resp := dto.LectureSummaryResponseDTO{LectureID: lectureID, Content: content}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// listLectureExplanations godoc
+// @Summary List lecture explanations
+// @Description Retrieves explanations for a lecture with pagination
+// @Tags lectures
+// @Produce json
+// @Param lectureId path string true "Lecture ID"
+// @Param limit query int false "Limit number of results"
+// @Param offset query int false "Pagination offset"
+// @Success 200 {array} dto.LectureExplanationResponseDTO
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "Lecture not found"
+// @Failure 500 {string} string "Failed to retrieve explanations"
+// @Router /lectures/{lectureId}/explanations [get]
+func (h *LectureHandler) listLectureExplanations(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+	// extract lectureId
+	lectureID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/lectures/"), "/explanations")
+	// verify lecture exists
+	lecture, err := h.lectureService.GetLectureByID(r.Context(), lectureID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve lecture: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if lecture == nil {
+		http.Error(w, "Lecture not found", http.StatusNotFound)
+		return
+	}
+	// authorization: verify user owns this course
+	course, err := h.courseService.GetCourseByID(r.Context(), lecture.CourseID)
+	if err != nil || course == nil || course.UserID != userID {
+		http.Error(w, "Lecture not found", http.StatusNotFound)
+		return
+	}
+	// parse query params
+	q := r.URL.Query()
+	limit := 10
+	if l := q.Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	offset := 0
+	if o := q.Get("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+	explanations, err := h.explanationService.GetExplanationsByLectureID(r.Context(), lectureID, limit, offset)
+	if err != nil {
+		http.Error(w, "Failed to retrieve explanations: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var resp []dto.LectureExplanationResponseDTO
+	for _, e := range explanations {
+		resp = append(resp, dto.LectureExplanationResponseDTO{
+			ID:          e.ID,
+			LectureID:   e.LectureID,
+			SlideNumber: e.SlideNumber,
+			Content:     e.Content,
+			CreatedAt:   e.CreatedAt,
+			UpdatedAt:   e.UpdatedAt,
+		})
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
