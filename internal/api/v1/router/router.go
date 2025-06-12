@@ -57,16 +57,18 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	courseRepo := repository.NewCourseRepo(db)
 	summaryRepo := repository.NewSummaryRepository(db)
 	explanationRepo := repository.NewExplanationRepository(db)
+	noteRepo := repository.NewNoteRepository(db)
 
 	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo)
 	courseSvc := service.NewCourseService(courseRepo)
 	lectureSvc := service.NewLectureService(lectureRepo)
 	summarySvc := service.NewSummaryService(summaryRepo)
 	explanationSvc := service.NewExplanationService(explanationRepo)
+	noteSvc := service.NewNoteService(noteRepo)
 
 	userHandler := handler.NewUserHandler(userSvc, validate)
 	courseHandler := handler.NewCourseHandler(courseSvc, validate)
-	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, summarySvc, explanationSvc, validate)
+	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, summarySvc, explanationSvc, noteSvc, validate)
 
 	// 5. Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)
