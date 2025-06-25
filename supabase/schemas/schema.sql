@@ -21,10 +21,12 @@ CREATE TABLE IF NOT EXISTS courses (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
 -- Enforce one default course per user
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_default_course_per_user
   ON courses(user_id)
   WHERE is_default;
+
 CREATE INDEX IF NOT EXISTS idx_courses_user_id ON courses(user_id);
 
 -------------------------------------------------------------------------------
@@ -54,6 +56,7 @@ CREATE TABLE IF NOT EXISTS lectures (
   accessed_at   TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
   completed_at  TIMESTAMPTZ
 );
+
 CREATE INDEX IF NOT EXISTS idx_lectures_user_id   ON lectures(user_id);
 CREATE INDEX IF NOT EXISTS idx_lectures_course_id ON lectures(course_id);
 
@@ -61,15 +64,17 @@ CREATE INDEX IF NOT EXISTS idx_lectures_course_id ON lectures(course_id);
 -- 4. Slide Table
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS slides (
-  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  lecture_id   UUID        NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
-  slide_number INT         NOT NULL,
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  lecture_id           UUID        NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
+  slide_number         INT         NOT NULL,
+  pending_chunks_count INT         NOT NULL DEFAULT 0,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(lecture_id, slide_number)
 );
-CREATE INDEX IF NOT EXISTS idx_slides_lecture_id        ON slides(lecture_id);
-CREATE INDEX IF NOT EXISTS idx_slides_lecture_slide     ON slides(lecture_id, slide_number);
+
+CREATE INDEX IF NOT EXISTS idx_slides_lecture_id    ON slides(lecture_id);
+CREATE INDEX IF NOT EXISTS idx_slides_lecture_slide ON slides(lecture_id, slide_number);
 
 -------------------------------------------------------------------------------
 -- 5. Chunk Table
@@ -85,11 +90,13 @@ CREATE TABLE IF NOT EXISTS chunks (
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(lecture_id, slide_number, chunk_index)
 );
+
 ALTER TABLE chunks
   ADD CONSTRAINT fk_chunks_slide
     FOREIGN KEY (lecture_id, slide_number)
       REFERENCES slides (lecture_id, slide_number)
       ON DELETE CASCADE;
+
 CREATE INDEX IF NOT EXISTS idx_chunks_lecture_slide ON chunks(lecture_id, slide_number);
 CREATE INDEX IF NOT EXISTS idx_chunks_lecture       ON chunks(lecture_id);
 
@@ -105,11 +112,13 @@ CREATE TABLE IF NOT EXISTS embeddings (
   created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+
 ALTER TABLE embeddings
   ADD CONSTRAINT fk_embeddings_chunk
     FOREIGN KEY (chunk_id)
       REFERENCES chunks (id)
       ON DELETE CASCADE;
+
 CREATE INDEX IF NOT EXISTS idx_embeddings_vector       ON embeddings USING ivfflat (vector) WITH (lists = 100);
 CREATE INDEX IF NOT EXISTS idx_embeddings_lecture_snap ON embeddings(lecture_id, slide_number);
 
@@ -122,6 +131,7 @@ CREATE TABLE IF NOT EXISTS summaries (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
 CREATE INDEX IF NOT EXISTS idx_summaries_by_lecture ON summaries(lecture_id);
 
 -------------------------------------------------------------------------------
@@ -132,16 +142,19 @@ CREATE TABLE IF NOT EXISTS explanations (
   lecture_id   UUID        NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
   slide_number INT         NOT NULL,
   content      TEXT        NOT NULL,
+  one_liner    TEXT        NOT NULL DEFAULT '',
   metadata     JSONB       NOT NULL DEFAULT '{}'::JSONB,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(lecture_id, slide_number)
 );
+
 ALTER TABLE explanations
   ADD CONSTRAINT fk_explanations_slide
     FOREIGN KEY (lecture_id, slide_number)
       REFERENCES slides (lecture_id, slide_number)
       ON DELETE CASCADE;
+
 CREATE INDEX IF NOT EXISTS idx_explanations_lecture_slide ON explanations(lecture_id, slide_number);
 
 -------------------------------------------------------------------------------
@@ -163,11 +176,13 @@ CREATE TABLE IF NOT EXISTS slide_images (
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(lecture_id, slide_number, image_index)
 );
+
 ALTER TABLE slide_images
   ADD CONSTRAINT fk_slide_images_slide
     FOREIGN KEY (lecture_id, slide_number)
       REFERENCES slides (lecture_id, slide_number)
       ON DELETE CASCADE;
+
 CREATE INDEX IF NOT EXISTS idx_slide_images_lecture_slide ON slide_images(lecture_id, slide_number);
 
 -------------------------------------------------------------------------------
@@ -181,5 +196,6 @@ CREATE TABLE IF NOT EXISTS notes (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
 CREATE INDEX IF NOT EXISTS idx_notes_user_id    ON notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_lecture_id ON notes(lecture_id);
