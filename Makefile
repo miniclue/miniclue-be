@@ -1,4 +1,4 @@
-.PHONY: all build run swagger clean
+.PHONY: all build run swagger clean fmt
 
 # Default target
 all: build
@@ -10,6 +10,11 @@ build:
 # Run the application
 run: build
 	./bin/miniclue-be
+
+# Format the code
+fmt:
+	@echo "Formatting code..."
+	go fmt ./...
 
 # Generate Swagger documentation
 swagger:

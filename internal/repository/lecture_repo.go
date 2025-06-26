@@ -14,6 +14,8 @@ type LectureRepository interface {
 	GetLectureByID(ctx context.Context, lectureID string) (*model.Lecture, error)
 	DeleteLecture(ctx context.Context, lectureID string) error
 	UpdateLecture(ctx context.Context, l *model.Lecture) error
+	CreateLecture(ctx context.Context, lecture *model.Lecture) (*model.Lecture, error)
+	EnqueueIngestionJob(ctx context.Context, lectureID string, storagePath string) error
 }
 
 type lectureRepository struct {
@@ -160,4 +162,23 @@ func (r *lectureRepository) UpdateLecture(ctx context.Context, l *model.Lecture)
 		&l.UpdatedAt,
 		&l.AccessedAt,
 	)
+}
+
+func (r *lectureRepository) CreateLecture(ctx context.Context, lecture *model.Lecture) (*model.Lecture, error) {
+	query := `INSERT INTO lectures (course_id, user_id, title, status, pdf_url) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at, updated_at, accessed_at`
+	err := r.db.QueryRowContext(ctx, query, lecture.CourseID, lecture.UserID, lecture.Title, lecture.Status, lecture.PDFURL).Scan(&lecture.ID, &lecture.CreatedAt, &lecture.UpdatedAt, &lecture.AccessedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create lecture: %w", err)
+	}
+	return lecture, nil
+}
+
+func (r *lectureRepository) EnqueueIngestionJob(ctx context.Context, lectureID string, storagePath string) error {
+	query := `SELECT pgmq.send('ingestion_queue', $1::jsonb, 0)`
+	job := fmt.Sprintf(`{"lecture_id": "%s", "storage_path": "%s"}`, lectureID, storagePath)
+	_, err := r.db.ExecContext(ctx, query, job)
+	if err != nil {
+		return fmt.Errorf("failed to enqueue ingestion job: %w", err)
+	}
+	return nil
 }

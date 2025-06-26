@@ -7,11 +7,16 @@ import (
 	"app/internal/middleware"
 	"app/internal/repository"
 	"app/internal/service"
+	"context"
 	"database/sql"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/go-playground/validator/v10"
 	_ "github.com/lib/pq"
 	"github.com/rs/cors"
@@ -48,10 +53,23 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	db.SetMaxIdleConns(25)
 	db.SetConnMaxIdleTime(5 * time.Minute)
 
-	// 3. Initialize validator
+	// 3. Initialize S3 client
+	s3Config, err := awsconfig.LoadDefaultConfig(context.TODO(),
+		awsconfig.WithRegion(cfg.S3Region),
+		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cfg.S3AccessKey, cfg.S3SecretKey, "")),
+	)
+	if err != nil {
+		logger.Fatal().Msgf("Failed to load S3 config: %v", err)
+	}
+	s3Client := s3.NewFromConfig(s3Config, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(cfg.S3URL)
+		o.UsePathStyle = true
+	})
+
+	// 4. Initialize validator
 	validate := validator.New(validator.WithRequiredStructEnabled())
 
-	// 4. Initialize repositories & services & handlers
+	// 5. Initialize repositories & services & handlers
 	userRepo := repository.NewUserRepo(db)
 	lectureRepo := repository.NewLectureRepository(db)
 	courseRepo := repository.NewCourseRepo(db)
@@ -61,7 +79,7 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 
 	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo)
 	courseSvc := service.NewCourseService(courseRepo)
-	lectureSvc := service.NewLectureService(lectureRepo)
+	lectureSvc := service.NewLectureService(lectureRepo, s3Client, cfg.S3Bucket)
 	summarySvc := service.NewSummaryService(summaryRepo)
 	explanationSvc := service.NewExplanationService(explanationRepo)
 	noteSvc := service.NewNoteService(noteRepo)
@@ -70,10 +88,10 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	courseHandler := handler.NewCourseHandler(courseSvc, validate)
 	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, summarySvc, explanationSvc, noteSvc, validate)
 
-	// 5. Initialize middleware
+	// 6. Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)
 
-	// 6. Create ServeMux router
+	// 7. Create ServeMux router
 	mux := http.NewServeMux()
 
 	// Create a subrouter for API v1 with the /api/v1 prefix
@@ -98,7 +116,7 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 		http.Redirect(w, r, "/api/v1"+restOfPath, http.StatusMovedPermanently)
 	})
 
-	// 7. Apply CORS middleware
+	// 8. Apply CORS middleware
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"}, // Allow all origins for development
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},

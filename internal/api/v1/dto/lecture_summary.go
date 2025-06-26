@@ -7,8 +7,8 @@ package dto
 // @Success 200 {object} dto.LectureSummaryResponseDTO
 // @Router /lectures/{lectureId}/summary [get]
 type LectureSummaryResponseDTO struct {
-    LectureID string `json:"lecture_id"`
-    Content   string `json:"content"`
+	LectureID string `json:"lecture_id"`
+	Content   string `json:"content"`
 }
 
 // LectureSummaryCreateDTO represents payload to create a summary for a specific lecture
