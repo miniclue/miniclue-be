@@ -230,8 +230,9 @@ func (h *CourseHandler) updateCourse(w http.ResponseWriter, r *http.Request) {
 
 // deleteCourse godoc
 // @Summary Delete a course
-// @Description Deletes an existing course by its ID and cascades deletion of related data.
+// @Description Deletes a course and all its lectures, removes associated PDFs from storage, clears any pending jobs in ingestion, embedding, explanation, and summary queues, and deletes related database records.
 // @Tags courses
+// @Produce json
 // @Param courseId path string true "Course ID"
 // @Success 204 {string} string "No Content"
 // @Failure 401 {string} string "Unauthorized: User ID not found in context"

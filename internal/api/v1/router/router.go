@@ -78,8 +78,8 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	noteRepo := repository.NewNoteRepository(db)
 
 	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo)
-	courseSvc := service.NewCourseService(courseRepo)
 	lectureSvc := service.NewLectureService(lectureRepo, s3Client, cfg.S3Bucket)
+	courseSvc := service.NewCourseService(courseRepo, lectureSvc)
 	summarySvc := service.NewSummaryService(summaryRepo)
 	explanationSvc := service.NewExplanationService(explanationRepo)
 	noteSvc := service.NewNoteService(noteRepo)

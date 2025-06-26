@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math"
 
 	"app/internal/model"
 	"app/internal/repository"
@@ -21,12 +23,13 @@ type CourseService interface {
 
 // courseService is the implementation of CourseService
 type courseService struct {
-	repo repository.CourseRepository
+	repo           repository.CourseRepository
+	lectureService LectureService
 }
 
 // NewCourseService creates a new CourseService
-func NewCourseService(repo repository.CourseRepository) CourseService {
-	return &courseService{repo: repo}
+func NewCourseService(repo repository.CourseRepository, lectureService LectureService) CourseService {
+	return &courseService{repo: repo, lectureService: lectureService}
 }
 
 // CreateCourse creates a new course record
@@ -64,6 +67,7 @@ func (s *courseService) UpdateCourse(ctx context.Context, c *model.Course) (*mod
 
 // DeleteCourse deletes a course by its ID
 func (s *courseService) DeleteCourse(ctx context.Context, courseID string) error {
+	// Retrieve course to ensure it exists and can be deleted
 	existingCourse, err := s.repo.GetCourseByID(ctx, courseID)
 	if err != nil {
 		return err
@@ -74,5 +78,18 @@ func (s *courseService) DeleteCourse(ctx context.Context, courseID string) error
 	if existingCourse.IsDefault {
 		return errors.New("default courses cannot be deleted")
 	}
+
+	// Clean up all lectures associated with this course
+	lectures, err := s.lectureService.GetLecturesByCourseID(ctx, courseID, math.MaxInt32, 0)
+	if err != nil {
+		return err
+	}
+	for _, lec := range lectures {
+		if err := s.lectureService.DeleteLecture(ctx, lec.ID); err != nil {
+			// Best-effort: log and continue
+			fmt.Printf("failed to delete lecture %s: %v\n", lec.ID, err)
+		}
+	}
+	// Delete the course record (cascading DB deletions)
 	return s.repo.DeleteCourse(ctx, courseID)
 }
