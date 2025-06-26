@@ -12,6 +12,11 @@ type Config struct {
 	DBPassword  string `envconfig:"DB_PASSWORD" required:"true"`
 	DBName      string `envconfig:"DB_NAME" required:"true"`
 	JWTSecret   string `envconfig:"SUPABASE_LOCAL_JWT_SECRET" required:"true"`
+	S3URL       string `envconfig:"SUPABASE_LOCAL_S3_URL" required:"true"`
+	S3Bucket    string `envconfig:"SUPABASE_LOCAL_S3_BUCKET" required:"true"`
+	S3Region    string `envconfig:"SUPABASE_LOCAL_S3_REGION" required:"true"`
+	S3AccessKey string `envconfig:"SUPABASE_LOCAL_S3_ACCESS_KEY" required:"true"`
+	S3SecretKey string `envconfig:"SUPABASE_LOCAL_S3_SECRET_KEY" required:"true"`
 }
 
 func Load() (*Config, error) {

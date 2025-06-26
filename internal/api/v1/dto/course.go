@@ -29,6 +29,6 @@ type CourseUpdateDTO struct {
 
 // CourseLectureResponseDTO is returned for lectures under a course
 type CourseLectureResponseDTO struct {
-    LectureID string `json:"lecture_id"`
-    Title     string `json:"title"`
+	LectureID string `json:"lecture_id"`
+	Title     string `json:"title"`
 }

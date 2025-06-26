@@ -9,12 +9,12 @@ import "time"
 // @Success 200 {array} dto.LectureExplanationResponseDTO
 // @Router /lectures/{lectureId}/explanations [get]
 type LectureExplanationResponseDTO struct {
-    ID          string    `json:"id"`
-    LectureID   string    `json:"lecture_id"`
-    SlideNumber int       `json:"slide_number"`
-    Content     string    `json:"content"`
-    CreatedAt   time.Time `json:"created_at"`
-    UpdatedAt   time.Time `json:"updated_at"`
+	ID          string    `json:"id"`
+	LectureID   string    `json:"lecture_id"`
+	SlideNumber int       `json:"slide_number"`
+	Content     string    `json:"content"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // LectureExplanationCreateDTO represents payload to create an explanation for a specific lecture

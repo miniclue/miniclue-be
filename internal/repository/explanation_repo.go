@@ -1,10 +1,10 @@
 package repository
 
 import (
+	"app/internal/model"
 	"context"
 	"database/sql"
 	"fmt"
-	"app/internal/model"
 )
 
 // ExplanationRepository defines explanation-related DB operations

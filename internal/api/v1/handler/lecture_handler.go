@@ -45,7 +45,7 @@ func NewLectureHandler(
 
 // RegisterRoutes mounts lecture routes under /lectures/{id}
 func (h *LectureHandler) RegisterRoutes(mux *http.ServeMux, authMw func(http.Handler) http.Handler) {
-	mux.Handle("/lectures", authMw(http.HandlerFunc(h.listLectures)))
+	mux.Handle("/lectures", authMw(http.HandlerFunc(h.handleLectures)))
 	mux.Handle("/lectures/", authMw(http.HandlerFunc(h.handleLecture)))
 }
 
@@ -247,6 +247,18 @@ func (h *LectureHandler) deleteLecture(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// handleLectures routes GET for listing and POST for uploading PDFs
+func (h *LectureHandler) handleLectures(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		h.listLectures(w, r)
+	case http.MethodPost:
+		h.uploadLecture(w, r)
+	default:
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 // listLectures godoc
 // @Summary List lectures
 // @Description Retrieves lectures filtered by course_id with pagination
@@ -313,6 +325,73 @@ func (h *LectureHandler) listLectures(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// uploadLecture godoc
+// @Summary Upload lecture PDF
+// @Description Uploads a PDF file to create a new lecture under the specified course.
+// @Tags lectures
+// @Accept multipart/form-data
+// @Produce json
+// @Param course_id formData string true "Course ID"
+// @Param title formData string false "Lecture title"
+// @Param file formData file true "PDF file"
+// @Success 201 {object} dto.LectureUploadResponseDTO
+// @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "Course not found or access denied"
+// @Failure 500 {string} string "Failed to upload lecture PDF"
+// @Router /lectures [post]
+func (h *LectureHandler) uploadLecture(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+	if r.Method != http.MethodPost || r.URL.Path != "/lectures" {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, "Error parsing multipart form: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	courseID := r.FormValue("course_id")
+	if courseID == "" {
+		http.Error(w, "Missing course_id", http.StatusBadRequest)
+		return
+	}
+	course, err := h.courseService.GetCourseByID(r.Context(), courseID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve course: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if course == nil || course.UserID != userID {
+		http.Error(w, "Course not found or access denied", http.StatusNotFound)
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Error retrieving the file: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	title := r.FormValue("title")
+	if title == "" {
+		title = header.Filename
+	}
+	lecture, err := h.lectureService.CreateLectureWithPDF(r.Context(), courseID, userID, title, file, header)
+	if err != nil {
+		http.Error(w, "Failed to create lecture: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resp := dto.LectureUploadResponseDTO{
+		LectureID: lecture.ID,
+		Status:    lecture.Status,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(resp)
 }
 

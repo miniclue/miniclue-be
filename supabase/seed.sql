@@ -48,3 +48,9 @@ VALUES
 INSERT INTO notes (id, user_id, lecture_id, content)
 VALUES
   ('70000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'Remember to review the definition of AI.');
+
+-- 10. Create Queues
+SELECT pgmq.create('ingestion_queue');
+SELECT pgmq.create('embedding_queue');
+SELECT pgmq.create('explanation_queue');
+SELECT pgmq.create('summary_queue');
