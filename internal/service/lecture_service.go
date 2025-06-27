@@ -124,9 +124,10 @@ func (s *lectureService) CreateLectureWithPDF(ctx context.Context, courseID, use
 	// 3. Update lecture with PDF URL and status
 	pdfURL := fmt.Sprintf("%s/%s/%s", aws.ToString(s.s3Client.Options().BaseEndpoint), s.bucketName, storagePath)
 	createdLecture.PDFURL = pdfURL
-	createdLecture.Status = "uploaded"
+	// After upload, mark as pending further processing
+	createdLecture.Status = "pending_processing"
 	if err := s.repo.UpdateLecture(ctx, createdLecture); err != nil {
-		return nil, fmt.Errorf("failed to update lecture with pdf url: %w", err)
+		return nil, fmt.Errorf("failed to update lecture with pdf url and status: %w", err)
 	}
 
 	// 4. Enqueue ingestion job

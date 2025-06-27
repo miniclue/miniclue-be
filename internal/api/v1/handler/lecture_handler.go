@@ -78,16 +78,8 @@ func (h *LectureHandler) handleLecture(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPut:
 		h.updateLecture(w, r)
 	case http.MethodPost:
-		if strings.HasSuffix(path, "/summary") {
-			h.createLectureSummary(w, r)
-			return
-		}
 		if strings.HasSuffix(path, "/notes") {
 			h.createLectureNote(w, r)
-			return
-		}
-		if strings.HasSuffix(path, "/explanations") {
-			h.createLectureExplanation(w, r)
 			return
 		}
 	case http.MethodDelete:
@@ -727,134 +719,6 @@ func (h *LectureHandler) createLectureNote(w http.ResponseWriter, r *http.Reques
 		Content:   created.Content,
 		CreatedAt: created.CreatedAt,
 		UpdatedAt: created.UpdatedAt,
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
-}
-
-// createLectureSummary godoc
-// @Summary Create a lecture summary
-// @Description Creates or updates summary for a lecture.
-// @Tags lectures
-// @Accept json
-// @Produce json
-// @Param lectureId path string true "Lecture ID"
-// @Param summary body dto.LectureSummaryCreateDTO true "Summary create data"
-// @Success 201 {object} dto.LectureSummaryResponseDTO
-// @Failure 400 {string} string "Invalid JSON payload or validation failed"
-// @Failure 401 {string} string "Unauthorized: User ID not found in context"
-// @Failure 404 {string} string "Lecture not found"
-// @Failure 409 {string} string "Summary already exists for this lecture"
-// @Failure 500 {string} string "Failed to create summary"
-// @Router /lectures/{lectureId}/summary [post]
-func (h *LectureHandler) createLectureSummary(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
-	if !ok || userID == "" {
-		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
-		return
-	}
-	lectureID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/lectures/"), "/summary")
-	lecture, err := h.lectureService.GetLectureByID(r.Context(), lectureID)
-	if err != nil {
-		http.Error(w, "Failed to retrieve lecture: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if lecture == nil {
-		http.Error(w, "Lecture not found", http.StatusNotFound)
-		return
-	}
-	course, err := h.courseService.GetCourseByID(r.Context(), lecture.CourseID)
-	if err != nil || course == nil || course.UserID != userID {
-		http.Error(w, "Lecture not found", http.StatusNotFound)
-		return
-	}
-	// Prevent duplicate summary for this lecture
-	existing, err := h.summaryService.GetSummaryByLectureID(r.Context(), lectureID)
-	if err != nil {
-		http.Error(w, "Failed to check existing summary: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if existing != nil {
-		http.Error(w, "Summary already exists for this lecture", http.StatusConflict)
-		return
-	}
-	var req dto.LectureSummaryCreateDTO
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	if err := h.validate.Struct(&req); err != nil {
-		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	summary, err := h.summaryService.CreateSummaryByLectureID(r.Context(), lectureID, req.Content)
-	if err != nil {
-		http.Error(w, "Failed to create summary: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	resp := dto.LectureSummaryResponseDTO{LectureID: summary.LectureID, Content: summary.Content}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
-}
-
-// createLectureExplanation godoc
-// @Summary Create a lecture explanation
-// @Description Creates a new explanation for a lecture.
-// @Tags lectures
-// @Accept json
-// @Produce json
-// @Param lectureId path string true "Lecture ID"
-// @Param explanation body dto.LectureExplanationCreateDTO true "Explanation create data"
-// @Success 201 {object} dto.LectureExplanationResponseDTO
-// @Failure 400 {string} string "Invalid JSON payload or validation failed"
-// @Failure 401 {string} string "Unauthorized: User ID not found in context"
-// @Failure 404 {string} string "Lecture not found"
-// @Failure 500 {string} string "Failed to create explanation"
-// @Router /lectures/{lectureId}/explanations [post]
-func (h *LectureHandler) createLectureExplanation(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
-	if !ok || userID == "" {
-		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
-		return
-	}
-	lectureID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/lectures/"), "/explanations")
-	lecture, err := h.lectureService.GetLectureByID(r.Context(), lectureID)
-	if err != nil {
-		http.Error(w, "Failed to retrieve lecture: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if lecture == nil {
-		http.Error(w, "Lecture not found", http.StatusNotFound)
-		return
-	}
-	course, err := h.courseService.GetCourseByID(r.Context(), lecture.CourseID)
-	if err != nil || course == nil || course.UserID != userID {
-		http.Error(w, "Lecture not found", http.StatusNotFound)
-		return
-	}
-	var req dto.LectureExplanationCreateDTO
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	if err := h.validate.Struct(&req); err != nil {
-		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	created, err := h.explanationService.CreateExplanationByLectureID(r.Context(), lectureID, req.SlideNumber, req.Content)
-	if err != nil {
-		http.Error(w, "Failed to create explanation: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	resp := dto.LectureExplanationResponseDTO{
-		ID:          created.ID,
-		LectureID:   created.LectureID,
-		SlideNumber: created.SlideNumber,
-		Content:     created.Content,
-		CreatedAt:   created.CreatedAt,
-		UpdatedAt:   created.UpdatedAt,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

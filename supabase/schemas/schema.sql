@@ -9,7 +9,7 @@ SET search_path TO public;
 -------------------------------------------------------------------------------
 -- ENUM Type for Lecture Status
 -------------------------------------------------------------------------------
-CREATE TYPE lecture_status AS ENUM ('uploading', 'uploaded', 'parsed', 'completed');
+CREATE TYPE lecture_status AS ENUM ('uploading', 'pending_processing', 'parsing', 'embedding', 'explaining', 'summarizing', 'complete', 'failed');
 
 -------------------------------------------------------------------------------
 -- 1. Course Table
@@ -47,16 +47,19 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 -- 3. Lecture Table
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS lectures (
-  id            UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id       UUID            NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  course_id     UUID            NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-  title         TEXT            NOT NULL,
-  pdf_url       TEXT            NOT NULL DEFAULT '',
-  status        lecture_status  NOT NULL DEFAULT 'uploaded',
-  created_at    TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-  accessed_at   TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-  completed_at  TIMESTAMPTZ
+  id                     UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id                UUID            NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  course_id              UUID            NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  title                  TEXT            NOT NULL,
+  pdf_url                TEXT            NOT NULL DEFAULT '',
+  status                 lecture_status  NOT NULL DEFAULT 'uploading',
+  error_message          TEXT            DEFAULT '',
+  total_slides           INT             NOT NULL DEFAULT 0,
+  processed_explanations INT             NOT NULL DEFAULT 0,
+  created_at             TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+  updated_at             TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+  accessed_at            TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+  completed_at           TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_lectures_user_id   ON lectures(user_id);
