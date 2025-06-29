@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/lib/pq"
 )
 
 // Client wraps a Postgres DB for pgmq queue operations.
@@ -57,9 +59,17 @@ func (c *Client) ReadWithPoll(ctx context.Context, queue string, timeoutSec, max
 
 // Delete removes messages by their IDs from the specified queue.
 func (c *Client) Delete(ctx context.Context, queue string, msgIDs []int64) error {
-	query := "SELECT pgmq.delete($1, $2)"
-	if _, err := c.db.ExecContext(ctx, query, queue, msgIDs); err != nil {
+	query := "SELECT pgmq.delete($1::text, $2::bigint[])"
+	if _, err := c.db.ExecContext(ctx, query, queue, pq.Array(msgIDs)); err != nil {
 		return fmt.Errorf("pgmq delete failed: %w", err)
+	}
+	return nil
+}
+
+// Exec runs a SQL query with the given arguments, returning an error if it fails.
+func (c *Client) Exec(ctx context.Context, query string, args ...interface{}) error {
+	if _, err := c.db.ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("db exec failed: %w", err)
 	}
 	return nil
 }

@@ -17,6 +17,18 @@ type Config struct {
 	S3Region    string `envconfig:"SUPABASE_LOCAL_S3_REGION" required:"true"`
 	S3AccessKey string `envconfig:"SUPABASE_LOCAL_S3_ACCESS_KEY" required:"true"`
 	S3SecretKey string `envconfig:"SUPABASE_LOCAL_S3_SECRET_KEY" required:"true"`
+
+	// Ingestion orchestrator settings
+	IngestionQueueName         string `envconfig:"INGESTION_QUEUE_NAME" default:"ingestion_queue"`
+	IngestionPollTimeoutSec    int    `envconfig:"INGESTION_POLL_TIMEOUT_SEC" default:"30"`
+	IngestionPollMaxMsg        int    `envconfig:"INGESTION_POLL_MAX_MSG" default:"1"`
+	PythonServiceBaseURL       string `envconfig:"PYTHON_SERVICE_BASE_URL" required:"true"`
+	IngestionMaxRetries        int    `envconfig:"INGESTION_MAX_RETRIES" default:"5"`
+	IngestionBackoffInitialSec int    `envconfig:"INGESTION_BACKOFF_INITIAL_SEC" default:"1"`
+	IngestionBackoffMaxSec     int    `envconfig:"INGESTION_BACKOFF_MAX_SEC" default:"60"`
+
+	// Dead-letter queue for ingestion failures
+	IngestionDeadLetterQueueName string `envconfig:"INGESTION_DEAD_LETTER_QUEUE_NAME" default:"ingestion_queue_dlq"`
 }
 
 func Load() (*Config, error) {

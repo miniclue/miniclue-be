@@ -28,19 +28,22 @@ clean:
 	rm -f bin/app
 	rm -rf docs/swagger
 
-# Worker build and run targets
+# Build orchestrator
 build-orchestrator:
 	go build -o bin/orchestrator ./cmd/orchestrator
 
-# Run the orchestrator
+# Run the orchestrator for ingestion
 run-orchestrator-ingestion: build-orchestrator
 	./bin/orchestrator --mode ingestion
 
+# Run the orchestrator for embedding
 run-orchestrator-embedding: build-orchestrator
 	./bin/orchestrator --mode embedding
 
+# Run the orchestrator for explanation
 run-orchestrator-explanation: build-orchestrator
 	./bin/orchestrator --mode explanation
 
+# Run the orchestrator for summary
 run-orchestrator-summary: build-orchestrator
 	./bin/orchestrator --mode summary

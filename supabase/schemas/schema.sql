@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS lectures (
   title                  TEXT            NOT NULL,
   pdf_url                TEXT            NOT NULL DEFAULT '',
   status                 lecture_status  NOT NULL DEFAULT 'uploading',
-  error_message          TEXT            DEFAULT '',
+  error_details          JSONB,
   total_slides           INT             NOT NULL DEFAULT 0,
   processed_slides       INT             NOT NULL DEFAULT 0,
   created_at             TIMESTAMPTZ     NOT NULL DEFAULT NOW(),

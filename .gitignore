@@ -5,7 +5,8 @@
 .DS_Store
 
 # Ignore env
-.env*
+.env
+.env.production
 
 # Ignore swagger docs
 docs/swagger

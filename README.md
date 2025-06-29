@@ -53,14 +53,13 @@ The Go worker binary supports four modes:
 
 First build the worker binary:
 
-    make build-orchestrator
+- make build-orchestrator
 
 Then run a specific mode:
-
-    ./bin/orchestrator --mode ingestion
-    ./bin/orchestrator --mode embedding
-    ./bin/orchestrator --mode explanation
-    ./bin/orchestrator --mode summary
+- make run-orchestrator-ingestion
+- make run-orchestrator-embedding
+- make run-orchestrator-explanation
+- make run-orchestrator-summary
 
 # Key API Route Groups
 
@@ -139,7 +138,7 @@ Then run a specific mode:
    ```
 
 4. **Ack or Retry**
-   - On HTTP 200: Go worker `DELETE` the message from `ingestion_queue` and emit metrics.
+   - On HTTP 200: Go worker `DELETE` the message from `ingestion_queue` and emit metrics. UPDATE `lectures.status = 'embedding'` and `updated_at = NOW()`.
    - **Error Handling**: let the Go orchestrator retry with exponential backoff; on repeated failures, move the job to your DLQ, update `lectures.status = 'failed'` and set `lectures.error_message`
 
 ### 3.2.1 Python Ingestion Service
@@ -236,9 +235,7 @@ Then run a specific mode:
                - **Decorative images** → `global/images/{image_hash}.png`
                </aside>
 
-4. **Finalize Ingestion**
-   - After all slides processed, UPDATE `lectures.status = 'embedding'` and `updated_at = NOW()`.
-5. **Reliability & Idempotency**
+4. **Reliability & Idempotency**
    - Wrap each slide's work (slides row, chunk inserts, image dedupe + metadata) in a DB transaction keyed on `slide_id`.
    - Use `ON CONFLICT DO NOTHING` for idempotent inserts (slides, decorative_images_global).
    - Log metrics and return rich error details back to the Go orchestrator for retry/DLQ handling.
