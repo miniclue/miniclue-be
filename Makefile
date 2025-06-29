@@ -1,15 +1,15 @@
-.PHONY: all build run swagger clean fmt
+.PHONY: all build run swagger clean fmt build-worker worker-ingestion worker-embedding worker-explanation worker-summary
 
 # Default target
 all: build
 
 # Build the application
 build:
-	go build -o bin/miniclue-be ./cmd/app
+	go build -o bin/app ./cmd/app
 
 # Run the application
 run: build
-	./bin/miniclue-be
+	./bin/app
 
 # Format the code
 fmt:
@@ -25,5 +25,22 @@ swagger:
 
 # Clean generated files
 clean:
-	rm -f bin/miniclue-be
+	rm -f bin/app
 	rm -rf docs/swagger
+
+# Worker build and run targets
+build-orchestrator:
+	go build -o bin/orchestrator ./cmd/orchestrator
+
+# Run the orchestrator
+run-orchestrator-ingestion: build-orchestrator
+	./bin/orchestrator --mode ingestion
+
+run-orchestrator-embedding: build-orchestrator
+	./bin/orchestrator --mode embedding
+
+run-orchestrator-explanation: build-orchestrator
+	./bin/orchestrator --mode explanation
+
+run-orchestrator-summary: build-orchestrator
+	./bin/orchestrator --mode summary
