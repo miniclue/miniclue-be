@@ -56,6 +56,7 @@ First build the worker binary:
 - make build-orchestrator
 
 Then run a specific mode:
+
 - make run-orchestrator-ingestion
 - make run-orchestrator-embedding
 - make run-orchestrator-explanation
