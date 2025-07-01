@@ -144,102 +144,108 @@ Then run a specific mode:
 
 ### 3.2.1 Python Ingestion Service
 
-1. **Download & Open PDF**
-   - Fetch bytes from Supabase Storage using your S3 client.
-   - Open the bytes in memory with PyMuPDF, yielding a `Document` with one page per slide.
-   - Update the `lectures` table's `total_slides` column to `doc.page_count`.
-2. **Initialise In-Run Content Registry**
+1. **Initialize Dependencies & Configuration**
 
-   - Create an empty map:
+   - Dynamic imports for heavy dependencies: `boto3`, `asyncpg`, `pymupdf`, `pytesseract`, `PIL`, `imagehash`
+   - Optional BLIP model loading for image captioning (Salesforce/blip-image-captioning-base)
+   - Initialize S3 client with Supabase Storage credentials
+   - Connect to Postgres using asyncpg
 
+2. **Download & Open PDF**
+
+   - Fetch PDF bytes from Supabase Storage using S3 client
+   - Open PDF in memory with PyMuPDF: `pymupdf.open(stream=pdf_bytes, filetype="pdf")`
+   - Update `lectures.total_slides = doc.page_count`
+
+3. **Initialize Content Registry**
+
+   - Create in-memory registry: `content_registry: dict[str, str] = {}` for deduplication
+
+4. **Process Each Slide (Page)**
+
+   For each `page_index` in range(`total_slides`):
+
+   **4.1. Slide Setup**
+
+   - `slide_number = page_index + 1`
+   - Insert slide record with transaction:
+     ```sql
+     INSERT INTO slides (lecture_id, slide_number, total_chunks, processed_chunks)
+     VALUES ($1, $2, 0, 0)
+     ON CONFLICT DO NOTHING
      ```
-     content_registry = {}   # maps phash → storage_path
 
+   **4.2. Text Processing**
+
+   - Extract text: `raw_text = page.get_text()`
+   - Chunk text using tiktoken (cl100k_base encoding):
+     - Chunk size: 1000 tokens
+     - Overlap: 200 tokens
+     - Step: 800 tokens
+   - Update `slides.total_chunks` with actual chunk count
+   - Insert chunks and enqueue embedding jobs:
+     ```sql
+     INSERT INTO chunks (slide_id, lecture_id, slide_number, chunk_index, text, token_count)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT DO NOTHING
+     ```
+   - Enqueue embedding job via pgmq:
+     ```sql
+     SELECT pgmq.send($1::text, $2::jsonb)
      ```
 
-3. **For each slide (page) in `doc`:**
+   **4.3. Image Processing**
 
-   1. **Reserve Slide & Initialise Counters**
+   **4.3.1. Extract Embedded Images**
 
-      - Compute `slide_number = page_index + 1`.
-      - Insert row into slides (in transaction)
+   - Get images: `page.get_images(full=True)`
+   - For each image reference:
+     - Extract image data: `doc.extract_image(xref)`
+     - Convert to PIL Image for processing
 
-        ```
-        INSERT INTO slides (lecture_id, slide_number, total_chunks, processed_chunks)
-        VALUES (lecture_id, slide_number, 0, 0)
-        ON CONFLICT DO NOTHING;
+   **4.3.2. Image Classification & Processing**
 
-        ```
+   - **OCR**: Run Tesseract: `pytesseract.image_to_string(img)`
+   - **Alt-text**: Run BLIP (if enabled): Generate caption using transformers
+   - **Hash**: Compute perceptual hash: `imagehash.phash(img)`
+   - **Classification Logic**:
+     - Content keywords: diagram, chart, graph, table, screenshot, code, equation, map, plot
+     - Decorative keywords: logo, icon, banner, background, illustration, photo, picture, drawing, artwork, decoration
+     - If OCR ≥30 chars OR (alt-text ≥4 words AND ≥30 chars) → content
+     - If decorative keywords present → decorative
+     - Default: decorative
 
-   2. **Extract Text & Image**
-      - Call `page.get_text()` → `raw_text`.
-      - Call `page.get_pixmap()` → `pixmap` (has `width`, `height`, and raw bytes).
-   3. **[Text] Chunk, Persist & Enqueue Embeddings (use transaction)**
-      1. Split `raw_text` into chunks of ~1000 tokens with 200-token overlap.
-      2. Let `total = number_of_chunks`.
-      3. UPDATE `slides.total_chunks = total` for this slide.
-      4. For each chunk with index `i`:
-         - INSERT chunk row into `chunks` table (slide_id, lecture_id, slide_number, i, text, token_count).
-         - Send a message to `embedding_queue` containing `{ chunk_id, slide_id, lecture_id, slide_number }`.
-   4. **[Image] Decorative vs Content Deduplication**
+   **4.3.3. Image Storage & Deduplication**
 
-      1. **Extract OCR & Alt-Text**
-         - Run Tesseract on `pixmap` → `ocr_text`.
-         - Run BLIP on `pixmap` → `alt_text`.
-      2. **Compute Perceptual Hash**
-         - Generate `phash = compute_phash(pixmap)`.
-      3. **Classify**
-         - If `ocr_text` has ≥30 characters **or** `alt_text` has ≥4 words **and** ≥30 characters, **and** `alt_text` is not exactly "a diagram" / "an image" / "slide illustration", then mark **content**; else **decorative**.
-      4. **Branch & Deduplicate**
+   - **Content Images**:
+     - Check `content_registry[phash]` for existing path
+     - If new: upload to `lectures/{lecture_id}/slides/{slide_number}/raw_images/{img_index}.{ext}`
+     - Store path in registry
+   - **Decorative Images**:
+     - Query `decorative_images_global` for existing hash
+     - If new: upload to `global/images/{phash}.png`
+     - Insert into global registry
+   - **Metadata Storage**:
+     ```sql
+     INSERT INTO slide_images (slide_id, lecture_id, slide_number, image_index,
+                              storage_path, image_hash, type, ocr_text, alt_text, width, height)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     ON CONFLICT DO NOTHING
+     ```
 
-         - **If content**:
+   **4.4. Full Slide Rendering**
 
-           - If `phash` in `content_registry`, reuse its `storage_path`.
-           - Otherwise, upload bytes to
+   - Render complete slide at 2x zoom: `page.get_pixmap(matrix=pymupdf.Matrix(2, 2))`
+   - Process rendered slide with OCR and BLIP
+   - Upload to `lectures/{lecture_id}/slides/{slide_number}/slide_image.png`
+   - Store metadata with `image_index = -1` and `type = 'slide_image'`
 
-             ```
-             lectures/{lectureId}/slides/{slideNumber}/raw_images/{imageIndex}.png
-
-             ```
-
-             store that path in `content_registry[phash]`.
-
-         - **If decorative**:
-
-           - Query `decorative_images_global` for a row with this exact `image_hash`.
-           - If found, reuse its `storage_path`.
-           - If not, upload bytes to
-
-             ```
-             global/images/{image_hash}.png
-
-             ```
-
-             then INSERT into `decorative_images_global(image_hash, storage_path)`.
-
-         - **Record Slide-Image Metadata in DB for both content and decorative**
-
-           - Insert one `slide_images` row capturing:
-
-             - `slide_id`, `lecture_id`, `slide_number`, `image_index`
-             - Chosen `storage_path` (new or reused)
-             - `image_hash`
-             - `type` - content/decorative
-             - `ocr_text`/`alt_text`
-             - Image dimensions (`width`, `height`)
-               <aside>
-               💡
-
-               **Naming conventions**
-
-               - **Content images** → `lectures/{lectureId}/slides/{slideNumber}/raw_images/{imageIndex}.{ext}`
-               - **Decorative images** → `global/images/{image_hash}.png`
-               </aside>
-
-4. **Reliability & Idempotency**
-   - Wrap each slide's work (slides row, chunk inserts, image dedupe + metadata) in a DB transaction keyed on `slide_id`.
-   - Use `ON CONFLICT DO NOTHING` for idempotent inserts (slides, decorative_images_global).
-   - Log metrics and return rich error details back to the Go orchestrator for retry/DLQ handling.
+5. **Error Handling & Reliability**
+   - Each slide processed in database transaction
+   - Comprehensive logging throughout process
+   - Graceful handling of BLIP failures
+   - Idempotent operations with `ON CONFLICT DO NOTHING`
+   - Proper connection cleanup in finally block
 
 ---
 
@@ -287,7 +293,7 @@ Then run a specific mode:
 2. **Fetch Chunk & Embed**
 
    - `SELECT text FROM chunks WHERE id = :chunk_id`
-   - Call your embedding API (OpenAI/Claude/Gemini) to get a vector.
+   - Call your embedding API (OpenAI) to get a vector.
    - **UPSERT** into the `embeddings` table:
 
      ```sql
@@ -301,7 +307,7 @@ Then run a specific mode:
 
      ```
 
-3. **Update Slide Progress and check for completion**
+3. **Update Slide Progress and check if all chunks are embedded for that slide**
 
    ```sql
    -- Atomically update and get the new values
@@ -316,16 +322,6 @@ Then run a specific mode:
 
 4. If `processed_chunks = total_chunks`, send a new job:
 
-   ```sql
-   SELECT processed_chunks, total_chunks
-     FROM slides
-    WHERE lecture_id   = :lecture_id
-      AND slide_number = :slide_number;
-
-   ```
-
-   If `processed_chunks = total_chunks`, send a new job:
-
    ```
    pgmq.send("explanation_queue", {
      "slide_id": "...",
@@ -334,7 +330,7 @@ Then run a specific mode:
    })
    ```
 
-5. **Update lecture status if all slides embedded**
+5. **Update lecture status if all slides are embedded for that lecture**
 
    1. Check if processed_chunks = total_chunks for all slides
    2. If yes, update lecture `status` to `explaining`

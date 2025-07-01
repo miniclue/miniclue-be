@@ -73,3 +73,8 @@ func (c *Client) Exec(ctx context.Context, query string, args ...interface{}) er
 	}
 	return nil
 }
+
+// QueryRow runs a query expected to return at most one row.
+func (c *Client) QueryRow(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	return c.db.QueryRowContext(ctx, query, args...)
+}
