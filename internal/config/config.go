@@ -22,28 +22,34 @@ type Config struct {
 	PythonServiceBaseURL string `envconfig:"PYTHON_SERVICE_BASE_URL" required:"true"`
 
 	// Ingestion orchestrator settings
-	IngestionQueueName         string `envconfig:"INGESTION_QUEUE_NAME" default:"ingestion_queue"`
-	IngestionPollTimeoutSec    int    `envconfig:"INGESTION_POLL_TIMEOUT_SEC" default:"30"`
-	IngestionPollMaxMsg        int    `envconfig:"INGESTION_POLL_MAX_MSG" default:"1"`
-	IngestionMaxRetries        int    `envconfig:"INGESTION_MAX_RETRIES" default:"5"`
-	IngestionBackoffInitialSec int    `envconfig:"INGESTION_BACKOFF_INITIAL_SEC" default:"1"`
-	IngestionBackoffMaxSec     int    `envconfig:"INGESTION_BACKOFF_MAX_SEC" default:"60"`
-	IngestionRequestTimeoutSec int    `envconfig:"INGESTION_REQUEST_TIMEOUT_SEC" default:"300"`
-
-	// Dead-letter queue for ingestion failures
+	IngestionQueueName           string `envconfig:"INGESTION_QUEUE_NAME" default:"ingestion_queue"`
+	IngestionPollTimeoutSec      int    `envconfig:"INGESTION_POLL_TIMEOUT_SEC" default:"30"`
+	IngestionPollMaxMsg          int    `envconfig:"INGESTION_POLL_MAX_MSG" default:"1"`
+	IngestionMaxRetries          int    `envconfig:"INGESTION_MAX_RETRIES" default:"5"`
+	IngestionBackoffInitialSec   int    `envconfig:"INGESTION_BACKOFF_INITIAL_SEC" default:"1"`
+	IngestionBackoffMaxSec       int    `envconfig:"INGESTION_BACKOFF_MAX_SEC" default:"60"`
+	IngestionRequestTimeoutSec   int    `envconfig:"INGESTION_REQUEST_TIMEOUT_SEC" default:"300"`
 	IngestionDeadLetterQueueName string `envconfig:"INGESTION_DEAD_LETTER_QUEUE_NAME" default:"ingestion_queue_dlq"`
 
 	// Embedding orchestrator settings
-	EmbeddingQueueName         string `envconfig:"EMBEDDING_QUEUE_NAME" default:"embedding_queue"`
-	EmbeddingPollTimeoutSec    int    `envconfig:"EMBEDDING_POLL_TIMEOUT_SEC" default:"30"`
-	EmbeddingPollMaxMsg        int    `envconfig:"EMBEDDING_POLL_MAX_MSG" default:"1"`
-	EmbeddingMaxRetries        int    `envconfig:"EMBEDDING_MAX_RETRIES" default:"5"`
-	EmbeddingBackoffInitialSec int    `envconfig:"EMBEDDING_BACKOFF_INITIAL_SEC" default:"1"`
-	EmbeddingBackoffMaxSec     int    `envconfig:"EMBEDDING_BACKOFF_MAX_SEC" default:"60"`
-	EmbeddingRequestTimeoutSec int    `envconfig:"EMBEDDING_REQUEST_TIMEOUT_SEC" default:"120"`
-
-	// Dead-letter queue for embedding failures
+	EmbeddingQueueName           string `envconfig:"EMBEDDING_QUEUE_NAME" default:"embedding_queue"`
+	EmbeddingPollTimeoutSec      int    `envconfig:"EMBEDDING_POLL_TIMEOUT_SEC" default:"30"`
+	EmbeddingPollMaxMsg          int    `envconfig:"EMBEDDING_POLL_MAX_MSG" default:"1"`
+	EmbeddingMaxRetries          int    `envconfig:"EMBEDDING_MAX_RETRIES" default:"5"`
+	EmbeddingBackoffInitialSec   int    `envconfig:"EMBEDDING_BACKOFF_INITIAL_SEC" default:"1"`
+	EmbeddingBackoffMaxSec       int    `envconfig:"EMBEDDING_BACKOFF_MAX_SEC" default:"60"`
+	EmbeddingRequestTimeoutSec   int    `envconfig:"EMBEDDING_REQUEST_TIMEOUT_SEC" default:"120"`
 	EmbeddingDeadLetterQueueName string `envconfig:"EMBEDDING_DEAD_LETTER_QUEUE_NAME" default:"embedding_queue_dlq"`
+
+	// Explanation orchestrator settings
+	ExplanationQueueName           string `envconfig:"EXPLANATION_QUEUE_NAME" default:"explanation_queue"`
+	ExplanationPollTimeoutSec      int    `envconfig:"EXPLANATION_POLL_TIMEOUT_SEC" default:"30"`
+	ExplanationPollMaxMsg          int    `envconfig:"EXPLANATION_POLL_MAX_MSG" default:"1"`
+	ExplanationMaxRetries          int    `envconfig:"EXPLANATION_MAX_RETRIES" default:"5"`
+	ExplanationBackoffInitialSec   int    `envconfig:"EXPLANATION_BACKOFF_INITIAL_SEC" default:"1"`
+	ExplanationBackoffMaxSec       int    `envconfig:"EXPLANATION_BACKOFF_MAX_SEC" default:"60"`
+	ExplanationRequestTimeoutSec   int    `envconfig:"EXPLANATION_REQUEST_TIMEOUT_SEC" default:"120"`
+	ExplanationDeadLetterQueueName string `envconfig:"EXPLANATION_DEAD_LETTER_QUEUE_NAME" default:"explanation_queue_dlq"`
 }
 
 func Load() (*Config, error) {
