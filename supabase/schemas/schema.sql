@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS slides (
   slide_number         INT         NOT NULL,
   total_chunks         INT         NOT NULL DEFAULT 0,
   processed_chunks     INT         NOT NULL DEFAULT 0,
+  raw_text             TEXT,
   created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(lecture_id, slide_number)
@@ -148,6 +149,7 @@ CREATE TABLE IF NOT EXISTS explanations (
   slide_number INT         NOT NULL,
   content      TEXT        NOT NULL,
   one_liner    TEXT        NOT NULL DEFAULT '',
+  slide_type   TEXT,        
   metadata     JSONB       NOT NULL DEFAULT '{}'::JSONB,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
