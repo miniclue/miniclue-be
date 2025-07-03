@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"time"
 
 	"app/internal/model"
 	"app/internal/repository"
@@ -23,6 +24,7 @@ type LectureService interface {
 	DeleteLecture(ctx context.Context, lectureID string) error
 	UpdateLecture(ctx context.Context, l *model.Lecture) error
 	CreateLectureWithPDF(ctx context.Context, courseID, userID, title string, file multipart.File, header *multipart.FileHeader) (*model.Lecture, error)
+	GetPresignedURL(ctx context.Context, storagePath string) (string, error)
 }
 
 // lectureService is the implementation of LectureService
@@ -151,4 +153,17 @@ func (s *lectureService) CreateLectureWithPDF(ctx context.Context, courseID, use
 	}
 
 	return createdLecture, nil
+}
+
+// GetPresignedURL generates a signed URL for the given storage path
+func (s *lectureService) GetPresignedURL(ctx context.Context, storagePath string) (string, error) {
+	presigner := s3.NewPresignClient(s.s3Client)
+	resp, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucketName),
+		Key:    aws.String(storagePath),
+	}, s3.WithPresignExpires(15*time.Minute))
+	if err != nil {
+		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
+	}
+	return resp.URL, nil
 }
