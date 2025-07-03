@@ -401,9 +401,9 @@ Payload:
 
 1. **Parse Payload**
 
-   Read `lecture_id` and `slide_number`.
+   Read `slide_id`, `lecture_id` and `slide_number`.
 
-2. **Fetch Context in One Go**
+2. **Fetch previous slides' one-liners**
 
    ```sql
    SELECT slide_number, one_liner

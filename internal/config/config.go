@@ -50,6 +50,16 @@ type Config struct {
 	ExplanationBackoffMaxSec       int    `envconfig:"EXPLANATION_BACKOFF_MAX_SEC" default:"60"`
 	ExplanationRequestTimeoutSec   int    `envconfig:"EXPLANATION_REQUEST_TIMEOUT_SEC" default:"120"`
 	ExplanationDeadLetterQueueName string `envconfig:"EXPLANATION_DEAD_LETTER_QUEUE_NAME" default:"explanation_queue_dlq"`
+
+	// Summary orchestrator settings
+	SummaryQueueName           string `envconfig:"SUMMARY_QUEUE_NAME" default:"summary_queue"`
+	SummaryPollTimeoutSec      int    `envconfig:"SUMMARY_POLL_TIMEOUT_SEC" default:"30"`
+	SummaryPollMaxMsg          int    `envconfig:"SUMMARY_POLL_MAX_MSG" default:"1"`
+	SummaryMaxRetries          int    `envconfig:"SUMMARY_MAX_RETRIES" default:"5"`
+	SummaryBackoffInitialSec   int    `envconfig:"SUMMARY_BACKOFF_INITIAL_SEC" default:"1"`
+	SummaryBackoffMaxSec       int    `envconfig:"SUMMARY_BACKOFF_MAX_SEC" default:"60"`
+	SummaryRequestTimeoutSec   int    `envconfig:"SUMMARY_REQUEST_TIMEOUT_SEC" default:"120"`
+	SummaryDeadLetterQueueName string `envconfig:"SUMMARY_DEAD_LETTER_QUEUE_NAME" default:"summary_queue_dlq"`
 }
 
 func Load() (*Config, error) {
