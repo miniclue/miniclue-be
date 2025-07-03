@@ -75,6 +75,10 @@ func (h *LectureHandler) handleLecture(w http.ResponseWriter, r *http.Request) {
 			h.listLectureNotes(w, r)
 			return
 		}
+		if strings.HasSuffix(path, "/url") {
+			h.getSignedURL(w, r)
+			return
+		}
 		h.getLecture(w, r)
 	case http.MethodPatch:
 		if strings.HasSuffix(path, "/notes") {
@@ -728,5 +732,47 @@ func (h *LectureHandler) createLectureNote(w http.ResponseWriter, r *http.Reques
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(resp)
+}
+
+// getSignedURL godoc
+// @Summary Get signed URL for lecture PDF
+// @Description Generates a signed URL for downloading the lecture PDF.
+// @Tags lectures
+// @Produce json
+// @Param lectureId path string true "Lecture ID"
+// @Success 200 {object} dto.SignedURLResponseDTO
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "Lecture not found"
+// @Failure 500 {string} string "Failed to generate signed URL"
+// @Router /lectures/{lectureId}/url [get]
+func (h *LectureHandler) getSignedURL(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+	lectureID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/lectures/"), "/url")
+	lecture, err := h.lectureService.GetLectureByID(r.Context(), lectureID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve lecture: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if lecture == nil {
+		http.Error(w, "Lecture not found", http.StatusNotFound)
+		return
+	}
+	course, err := h.courseService.GetCourseByID(r.Context(), lecture.CourseID)
+	if err != nil || course == nil || course.UserID != userID {
+		http.Error(w, "Lecture not found", http.StatusNotFound)
+		return
+	}
+	url, err := h.lectureService.GetPresignedURL(r.Context(), lecture.StoragePath)
+	if err != nil {
+		http.Error(w, "Failed to generate signed URL: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resp := dto.SignedURLResponseDTO{URL: url}
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
