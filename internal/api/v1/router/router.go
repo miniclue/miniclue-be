@@ -86,7 +86,7 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 
 	userHandler := handler.NewUserHandler(userSvc, validate)
 	courseHandler := handler.NewCourseHandler(courseSvc, validate)
-	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, summarySvc, explanationSvc, noteSvc, validate)
+	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, summarySvc, explanationSvc, noteSvc, validate, cfg.S3URL, cfg.S3Bucket)
 
 	// 6. Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)

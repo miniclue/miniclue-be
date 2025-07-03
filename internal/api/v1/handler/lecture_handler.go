@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -130,14 +129,14 @@ func (h *LectureHandler) getLecture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := dto.LectureResponseDTO{
-		LectureID:  lecture.ID,
-		CourseID:   lecture.CourseID,
-		Title:      lecture.Title,
-		PdfURL:     fmt.Sprintf("%s/storage/v1/object/public/%s/%s", h.s3BaseURL, h.s3Bucket, lecture.StoragePath),
-		Status:     lecture.Status,
-		CreatedAt:  lecture.CreatedAt,
-		UpdatedAt:  lecture.UpdatedAt,
-		AccessedAt: lecture.AccessedAt,
+		LectureID:   lecture.ID,
+		CourseID:    lecture.CourseID,
+		Title:       lecture.Title,
+		StoragePath: lecture.StoragePath,
+		Status:      lecture.Status,
+		CreatedAt:   lecture.CreatedAt,
+		UpdatedAt:   lecture.UpdatedAt,
+		AccessedAt:  lecture.AccessedAt,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
@@ -194,14 +193,14 @@ func (h *LectureHandler) updateLecture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := dto.LectureResponseDTO{
-		LectureID:  lecture.ID,
-		CourseID:   lecture.CourseID,
-		Title:      lecture.Title,
-		PdfURL:     fmt.Sprintf("%s/storage/v1/object/public/%s/%s", h.s3BaseURL, h.s3Bucket, lecture.StoragePath),
-		Status:     lecture.Status,
-		CreatedAt:  lecture.CreatedAt,
-		UpdatedAt:  lecture.UpdatedAt,
-		AccessedAt: lecture.AccessedAt,
+		LectureID:   lecture.ID,
+		CourseID:    lecture.CourseID,
+		Title:       lecture.Title,
+		StoragePath: lecture.StoragePath,
+		Status:      lecture.Status,
+		CreatedAt:   lecture.CreatedAt,
+		UpdatedAt:   lecture.UpdatedAt,
+		AccessedAt:  lecture.AccessedAt,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
@@ -313,14 +312,14 @@ func (h *LectureHandler) listLectures(w http.ResponseWriter, r *http.Request) {
 	var resp []dto.LectureResponseDTO
 	for _, lec := range lectures {
 		resp = append(resp, dto.LectureResponseDTO{
-			LectureID:  lec.ID,
-			CourseID:   lec.CourseID,
-			Title:      lec.Title,
-			PdfURL:     fmt.Sprintf("%s/storage/v1/object/public/%s/%s", h.s3BaseURL, h.s3Bucket, lec.StoragePath),
-			Status:     lec.Status,
-			CreatedAt:  lec.CreatedAt,
-			UpdatedAt:  lec.UpdatedAt,
-			AccessedAt: lec.AccessedAt,
+			LectureID:   lec.ID,
+			CourseID:    lec.CourseID,
+			Title:       lec.Title,
+			StoragePath: lec.StoragePath,
+			Status:      lec.Status,
+			CreatedAt:   lec.CreatedAt,
+			UpdatedAt:   lec.UpdatedAt,
+			AccessedAt:  lec.AccessedAt,
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")
