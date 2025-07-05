@@ -170,7 +170,7 @@ func (h *CourseHandler) getCourse(w http.ResponseWriter, r *http.Request) {
 // @Param courseId path string true "Course ID"
 // @Param course body dto.CourseUpdateDTO true "Course update request"
 // @Success 200 {object} dto.CourseResponseDTO
-// @Failure 400 {string} string "Invalid JSON payload or validation failed"
+// @Failure 400 {string} string "Invalid JSON payload, validation failed, or title cannot be empty"
 // @Failure 401 {string} string "Unauthorized: User ID not found in context"
 // @Failure 404 {string} string "Course not found"
 // @Failure 500 {string} string "Failed to update course"
@@ -189,6 +189,10 @@ func (h *CourseHandler) updateCourse(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.validate.Struct(&req); err != nil {
 		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Title != nil && strings.TrimSpace(*req.Title) == "" {
+		http.Error(w, "Title cannot be empty", http.StatusBadRequest)
 		return
 	}
 	course, err := h.courseService.GetCourseByID(r.Context(), courseID)

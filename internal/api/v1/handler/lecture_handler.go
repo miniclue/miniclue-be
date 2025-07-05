@@ -154,7 +154,7 @@ func (h *LectureHandler) getLecture(w http.ResponseWriter, r *http.Request) {
 // @Param lectureId path string true "Lecture ID"
 // @Param lecture body dto.LectureUpdateDTO true "Lecture update data"
 // @Success 200 {object} dto.LectureResponseDTO
-// @Failure 400 {string} string "Invalid JSON payload"
+// @Failure 400 {string} string "Invalid JSON payload, or title cannot be empty"
 // @Failure 401 {string} string "Unauthorized: User ID not found in context"
 // @Failure 404 {string} string "Lecture not found"
 // @Failure 500 {string} string "Failed to update lecture"
@@ -169,6 +169,10 @@ func (h *LectureHandler) updateLecture(w http.ResponseWriter, r *http.Request) {
 	var req dto.LectureUpdateDTO
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Title != nil && strings.TrimSpace(*req.Title) == "" {
+		http.Error(w, "Title cannot be empty", http.StatusBadRequest)
 		return
 	}
 	lecture, err := h.lectureService.GetLectureByID(r.Context(), lectureID)
