@@ -11,6 +11,14 @@ build:
 run: build
 	./bin/app
 
+# Build the setup-pubsub command
+build-setup-pubsub:
+	go build -o bin/setup-pubsub ./cmd/setup-pubsub
+
+# Run the setup-pubsub command
+setup-pubsub: build-setup-pubsub
+	./bin/setup-pubsub
+
 # Format the code
 fmt:
 	@echo "Formatting code..."
@@ -24,26 +32,7 @@ swagger:
 	@echo "Swagger documentation generated in docs/swagger"
 
 # Clean generated files
-clean:
+clean: 
 	rm -f bin/app
+	rm -f bin/setup-pubsub
 	rm -rf docs/swagger
-
-# Build orchestrator
-build-orchestrator:
-	go build -o bin/orchestrator ./cmd/orchestrator
-
-# Run the orchestrator for ingestion
-run-orchestrator-ingestion: build-orchestrator
-	./bin/orchestrator --mode ingestion
-
-# Run the orchestrator for embedding
-run-orchestrator-embedding: build-orchestrator
-	./bin/orchestrator --mode embedding
-
-# Run the orchestrator for explanation
-run-orchestrator-explanation: build-orchestrator
-	./bin/orchestrator --mode explanation
-
-# Run the orchestrator for summary
-run-orchestrator-summary: build-orchestrator
-	./bin/orchestrator --mode summary

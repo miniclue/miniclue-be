@@ -7,6 +7,7 @@ import (
 	"app/internal/config"
 
 	"cloud.google.com/go/pubsub"
+	"google.golang.org/api/option"
 )
 
 // Publisher defines an interface for publishing messages.
@@ -21,7 +22,12 @@ type PubSubPublisher struct {
 
 // NewPublisher creates a new PubSubPublisher using the GCP project from config.
 func NewPublisher(ctx context.Context, cfg *config.Config) (*PubSubPublisher, error) {
-	client, err := pubsub.NewClient(ctx, cfg.GCPProjectID)
+	var opts []option.ClientOption
+	if cfg.PubSubEmulatorHost != "" {
+		opts = append(opts, option.WithEndpoint(cfg.PubSubEmulatorHost), option.WithoutAuthentication())
+	}
+
+	client, err := pubsub.NewClient(ctx, cfg.GCPProjectID, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Pub/Sub client: %w", err)
 	}

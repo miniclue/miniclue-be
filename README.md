@@ -51,6 +51,7 @@ miniclue-be/
 ### Prerequisites
 
 - Go 1.22+ installed
+- Docker and Docker Compose installed
 
 ### Installation
 
@@ -66,30 +67,52 @@ go mod download
 2.  Export the required environment variables. You can create a `.env` file and source it.
 
 ```bash
-export DB_HOST="localhost"
-export DB_PORT="5432"
-export DB_USER="postgres"
-export DB_PASSWORD="your-db-password"
-export DB_NAME="postgres"
-export SUPABASE_LOCAL_JWT_SECRET="your-super-secret-jwt-token"
-export SUPABASE_LOCAL_S3_URL="http://localhost:9000"
-export SUPABASE_LOCAL_S3_BUCKET="your-s3-bucket"
-export SUPABASE_LOCAL_S3_REGION="us-east-1"
-export SUPABASE_LOCAL_S3_ACCESS_KEY="your-s3-access-key"
-export SUPABASE_LOCAL_S3_SECRET_KEY="your-s3-secret-key"
-export GCP_PROJECT_ID="your-gcp-project-id"
-export PUBSUB_INGESTION_TOPIC="ingestion"
+# Supabase Local Development
+DB_HOST=localhost
+DB_PORT=54322
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=postgres
+SUPABASE_LOCAL_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long
+SUPABASE_LOCAL_S3_URL=http://localhost:54324
+SUPABASE_LOCAL_S3_BUCKET=storage
+SUPABASE_LOCAL_S3_REGION=us-east-1
+SUPABASE_LOCAL_S3_ACCESS_KEY=owner
+SUPABASE_LOCAL_S3_SECRET_KEY=owner
+
+# Google Cloud Pub/Sub Emulator
+GCP_PROJECT_ID=miniclue-dev
+PUBSUB_INGESTION_TOPIC=ingestion
+PUBSUB_EMULATOR_HOST=localhost:8085
 ```
 
 ## Running the Application
 
-### API Server
+### 1. Start Local Services
+
+This project uses Docker Compose to run the Google Cloud Pub/Sub emulator.
+
+```bash
+docker-compose up -d
+```
+
+### 2. Set Up Local Pub/Sub Environment
+
+After starting the emulator for the first time (or to reset it), you must create the necessary topics and subscriptions. A helper command is provided for this.
+
+```bash
+make setup-pubsub
+```
+
+### 3. Run the API Server
 
 To build and run the main API server:
 
 ```bash
 make run
 ```
+
+The API server will now be running and connected to the local Pub/Sub emulator.
 
 ## API Endpoints
 

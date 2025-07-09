@@ -21,6 +21,7 @@ type Config struct {
 	// Pub/Sub ingestion topic
 	GCPProjectID         string `envconfig:"GCP_PROJECT_ID" required:"true"`
 	PubSubIngestionTopic string `envconfig:"PUBSUB_INGESTION_TOPIC" default:"ingestion"`
+	PubSubEmulatorHost   string `envconfig:"PUBSUB_EMULATOR_HOST"`
 }
 
 func Load() (*Config, error) {
