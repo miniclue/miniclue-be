@@ -11,7 +11,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -30,13 +29,21 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	logger.Info().Msg("Router initialized")
 
 	// 2. Open DB connection (connection pooling)
-	dsn :=
-		"host=" + cfg.DBHost +
-			" port=" + strconv.Itoa(cfg.DBPort) +
-			" user=" + cfg.DBUser +
-			" password=" + cfg.DBPassword +
-			" dbname=" + cfg.DBName +
-			" sslmode=disable"
+	dsn := cfg.DBConnectionString
+	// In a development environment, we want to ensure that SSL is disabled for
+	// local testing. In production, the connection string should be provided
+	// with the correct SSL settings.
+	if cfg.Environment == "development" && !strings.Contains(dsn, "sslmode") {
+		separator := " "
+		if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+			if strings.Contains(dsn, "?") {
+				separator = "&"
+			} else {
+				separator = "?"
+			}
+		}
+		dsn += separator + "sslmode=disable"
+	}
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		logger.Fatal().Msgf("Failed to open DB connection: %v", err)
