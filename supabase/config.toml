@@ -28,7 +28,7 @@ port = 54322
 shadow_port = 54320
 # The database major version to use. This has to be the same as your remote database's. Run `SHOW
 # server_version;` on the remote database to check.
-major_version = 15
+major_version = 17
 
 [db.pooler]
 enabled = false
@@ -111,7 +111,7 @@ additional_redirect_urls = ["https://127.0.0.1:3000"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT secret
-jwt_secret = "env(SUPABASE_LOCAL_JWT_SECRET)"
+jwt_secret = "env(SUPABASE_JWT_SECRET)"
 # If disabled, the refresh token will never expire.
 enable_refresh_token_rotation = true
 # Allows refresh tokens to be reused after expiry, up to the specified interval in seconds.
@@ -156,11 +156,11 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
-max_frequency = "1s"
+max_frequency = "1m0s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
@@ -243,8 +243,8 @@ max_frequency = "5s"
 # `twitter`, `slack`, `spotify`, `workos`, `zoom`.
 [auth.external.google]
 enabled = true
-client_id = "env(SUPABASE_LOCAL_AUTH_GOOGLE_CLIENT_ID)"
-secret = "env(SUPABASE_LOCAL_AUTH_GOOGLE_SECRET)"
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
 redirect_uri = "http://localhost:54321/auth/v1/callback"
 
 [auth.external.apple]

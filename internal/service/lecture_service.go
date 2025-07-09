@@ -3,12 +3,14 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"time"
 
 	"app/internal/model"
+	"app/internal/pubsub"
 	"app/internal/repository"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -29,17 +31,21 @@ type LectureService interface {
 
 // lectureService is the implementation of LectureService
 type lectureService struct {
-	repo       repository.LectureRepository
-	s3Client   *s3.Client
-	bucketName string
+	repo           repository.LectureRepository
+	s3Client       *s3.Client
+	bucketName     string
+	publisher      pubsub.Publisher
+	ingestionTopic string
 }
 
 // NewLectureService creates a new LectureService
-func NewLectureService(repo repository.LectureRepository, s3Client *s3.Client, bucketName string) LectureService {
+func NewLectureService(repo repository.LectureRepository, s3Client *s3.Client, bucketName string, publisher pubsub.Publisher, ingestionTopic string) LectureService {
 	return &lectureService{
-		repo:       repo,
-		s3Client:   s3Client,
-		bucketName: bucketName,
+		repo:           repo,
+		s3Client:       s3Client,
+		bucketName:     bucketName,
+		publisher:      publisher,
+		ingestionTopic: ingestionTopic,
 	}
 }
 
@@ -146,10 +152,21 @@ func (s *lectureService) CreateLectureWithPDF(ctx context.Context, courseID, use
 		return nil, fmt.Errorf("failed to update lecture with pdf url and status: %w", err)
 	}
 
-	// 4. Enqueue ingestion job
-	if err := s.repo.EnqueueIngestionJob(ctx, createdLecture.ID, storagePath); err != nil {
-		// Log, but don't fail the request
-		fmt.Printf("failed to enqueue ingestion job: %v", err)
+	// 4. Publish ingestion job to Pub/Sub
+	payload := struct {
+		LectureID   string `json:"lecture_id"`
+		StoragePath string `json:"storage_path"`
+	}{
+		LectureID:   createdLecture.ID,
+		StoragePath: storagePath,
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Printf("failed to marshal ingestion payload: %v\n", err)
+	} else {
+		if _, err := s.publisher.Publish(ctx, s.ingestionTopic, data); err != nil {
+			fmt.Printf("failed to publish ingestion job: %v\n", err)
+		}
 	}
 
 	return createdLecture, nil

@@ -11,6 +11,23 @@ build:
 run: build
 	./bin/app
 
+# Build the setup-pubsub command for the local environment
+build-setup-pubsub-local:
+	go build -o bin/setup-pubsub-local ./cmd/setup-pubsub-local
+
+# Run the setup for the local Pub/Sub emulator.
+# This will delete all existing topics and subscriptions and create new ones.
+.PHONY: setup-pubsub-local
+setup-pubsub-local: build-setup-pubsub-local
+	./bin/setup-pubsub-local
+
+# Deploy Pub/Sub resources to staging or production.
+# Usage: make deploy-pubsub env=staging
+#        make deploy-pubsub env=production
+.PHONY: deploy-pubsub
+deploy-pubsub:
+	./scripts/setup_pubsub.sh $(env)
+
 # Format the code
 fmt:
 	@echo "Formatting code..."
@@ -24,26 +41,7 @@ swagger:
 	@echo "Swagger documentation generated in docs/swagger"
 
 # Clean generated files
-clean:
+clean: 
 	rm -f bin/app
+	rm -f bin/setup-pubsub-local
 	rm -rf docs/swagger
-
-# Build orchestrator
-build-orchestrator:
-	go build -o bin/orchestrator ./cmd/orchestrator
-
-# Run the orchestrator for ingestion
-run-orchestrator-ingestion: build-orchestrator
-	./bin/orchestrator --mode ingestion
-
-# Run the orchestrator for embedding
-run-orchestrator-embedding: build-orchestrator
-	./bin/orchestrator --mode embedding
-
-# Run the orchestrator for explanation
-run-orchestrator-explanation: build-orchestrator
-	./bin/orchestrator --mode explanation
-
-# Run the orchestrator for summary
-run-orchestrator-summary: build-orchestrator
-	./bin/orchestrator --mode summary

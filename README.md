@@ -12,7 +12,6 @@ A backend service for the miniclue application, providing APIs for managing cour
   - [Configuration](#configuration)
 - [Running the Application](#running-the-application)
   - [API Server](#api-server)
-  - [Orchestrator](#orchestrator)
 - [API Endpoints](#api-endpoints)
 - [Database Migrations](#database-migrations)
 - [Testing](#testing)
@@ -24,8 +23,7 @@ A backend service for the miniclue application, providing APIs for managing cour
 - Supabase PostgreSQL database with migration scripts
 - User authentication and authorization middleware
 - Orchestration pipelines for embeddings, summaries, and explanations
-- Background task queue with PG message queue client
-- Structured logging using standard library
+- Push-based Google Cloud Pub/Sub handlers for asynchronous processing
 
 ## Project Structure
 
@@ -33,7 +31,6 @@ A backend service for the miniclue application, providing APIs for managing cour
 miniclue-be/
 ├── cmd/
 │   ├── app/          # Main API server entrypoint
-│   └── orchestrator/ # Background orchestrator service
 ├── internal/         # Application code
 │   ├── api/v1/       # DTOs, handlers, router
 │   ├── config/       # Configuration loader
@@ -54,6 +51,7 @@ miniclue-be/
 ### Prerequisites
 
 - Go 1.22+ installed
+- Docker and Docker Compose installed
 
 ### Installation
 
@@ -66,26 +64,44 @@ go mod download
 ### Configuration
 
 1.  Set up your Supabase project locally or in the cloud.
-2.  Export the required environment variables. You can create a `.env` file and source it.
-
-```bash
-export DB_HOST="localhost"
-export DB_PORT="5432"
-export DB_USER="postgres"
-export DB_PASSWORD="your-db-password"
-export DB_NAME="postgres"
-export SUPABASE_LOCAL_JWT_SECRET="your-super-secret-jwt-token"
-export SUPABASE_LOCAL_S3_URL="http://localhost:9000"
-export SUPABASE_LOCAL_S3_BUCKET="your-s3-bucket"
-export SUPABASE_LOCAL_S3_REGION="us-east-1"
-export SUPABASE_LOCAL_S3_ACCESS_KEY="your-s3-access-key"
-export SUPABASE_LOCAL_S3_SECRET_KEY="your-s3-secret-key"
-export PYTHON_SERVICE_BASE_URL="http://localhost:8000"
-```
+2.  Export the required environment variables. See `.env.example` for reference.
 
 ## Running the Application
 
-### API Server
+### 1. Start Local Services (Local Development Only)
+
+This project uses Docker Compose to run the Google Cloud Pub/Sub emulator.
+
+```bash
+docker-compose up -d
+```
+
+### 2. Set Up Pub/Sub Environment
+
+This step uses a Go program to configure Pub/Sub topics and subscriptions. It can target your local emulator, staging, or production.
+
+**Important**: Before running for `staging` or `production`, you must authenticate with Google Cloud:
+
+```bash
+gcloud auth application-default login
+```
+
+The account you use must have the `Pub/Sub Editor` role on the target GCP project.
+
+To run the setup:
+
+```bash
+# For local development (resets all topics/subscriptions)
+make setup-pubsub env=local
+
+# For staging (creates or updates resources, does not delete)
+make setup-pubsub env=staging
+
+# For production (creates or updates resources, does not delete)
+make setup-pubsub env=production
+```
+
+### 3. Run the API Server
 
 To build and run the main API server:
 
@@ -93,41 +109,19 @@ To build and run the main API server:
 make run
 ```
 
-### Orchestrator
-
-To run the background orchestrator for a specific task:
-
-```bash
-# For ingestion
-make run-orchestrator-ingestion
-
-# For embedding
-make run-orchestrator-embedding
-
-# For explanation
-make run-orchestrator-explanation
-
-# For summary
-make run-orchestrator-summary
-```
-
-## Makefile Commands
-
-This project uses a `Makefile` to streamline common development tasks.
-
-- `make build`: Builds the API server binary.
-- `make run`: Builds and runs the API server.
-- `make build-orchestrator`: Builds the orchestrator binary.
-- `make run-orchestrator-ingestion`: Runs the orchestrator in ingestion mode.
-- `make run-orchestrator-embedding`: Runs the orchestrator in embedding mode.
-- `make run-orchestrator-explanation`: Runs the orchestrator in explanation mode.
-- `make run-orchestrator-summary`: Runs the orchestrator in summary mode.
-- `make fmt`: Formats all Go source code.
-- `make swagger`: Generates Swagger API documentation.
-- `make clean`: Removes generated binaries and documentation.
-- `go test ./...`: Run unit and integration tests (no make command).
+The API server will now be running and connected to the local Pub/Sub emulator.
 
 ## API Endpoints
 
 Refer to `internal/api/v1/router/router.go` for detailed endpoint documentation.
 You can also generate Swagger documentation by running `make swagger`.
+
+## Full CI/CD Workflow
+
+1. Developer writes code, tests locally, and commits to a feature branch.
+2. Developer opens a PR from the feature branch to main.
+3. Code is reviewed by a reviewer.
+4. Once approved, PR is merged to main.
+5. GitHub Actions workflow builds and deploys to staging.
+6. Developer tests in staging.
+7. If no issues are detected in staging, developer manually deploys to production using Github Actions.

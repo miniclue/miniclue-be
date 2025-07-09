@@ -5,12 +5,13 @@ import (
 	"app/internal/config"
 	"app/internal/logger"
 	"app/internal/middleware"
+	"app/internal/pubsub"
 	"app/internal/repository"
 	"app/internal/service"
 	"context"
 	"database/sql"
 	"net/http"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -28,13 +29,21 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	logger.Info().Msg("Router initialized")
 
 	// 2. Open DB connection (connection pooling)
-	dsn :=
-		"host=" + cfg.DBHost +
-			" port=" + strconv.Itoa(cfg.DBPort) +
-			" user=" + cfg.DBUser +
-			" password=" + cfg.DBPassword +
-			" dbname=" + cfg.DBName +
-			" sslmode=disable"
+	dsn := cfg.DBConnectionString
+	// In a development environment, we want to ensure that SSL is disabled for
+	// local testing. In production, the connection string should be provided
+	// with the correct SSL settings.
+	if cfg.Environment == "development" && !strings.Contains(dsn, "sslmode") {
+		separator := " "
+		if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+			if strings.Contains(dsn, "?") {
+				separator = "&"
+			} else {
+				separator = "?"
+			}
+		}
+		dsn += separator + "sslmode=disable"
+	}
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		logger.Fatal().Msgf("Failed to open DB connection: %v", err)
@@ -69,7 +78,14 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	// 4. Initialize validator
 	validate := validator.New(validator.WithRequiredStructEnabled())
 
-	// 5. Initialize repositories & services & handlers
+	// 5. Initialize Pub/Sub publisher
+	pubSubPublisher, err := pubsub.NewPublisher(context.Background(), cfg)
+	if err != nil {
+		logger.Fatal().Msgf("Failed to create Pub/Sub publisher: %v", err)
+		return nil, nil, err
+	}
+
+	// 6. Initialize repositories & services & handlers
 	userRepo := repository.NewUserRepo(db)
 	lectureRepo := repository.NewLectureRepository(db)
 	courseRepo := repository.NewCourseRepo(db)
@@ -78,7 +94,7 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	noteRepo := repository.NewNoteRepository(db)
 
 	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo)
-	lectureSvc := service.NewLectureService(lectureRepo, s3Client, cfg.S3Bucket)
+	lectureSvc := service.NewLectureService(lectureRepo, s3Client, cfg.S3Bucket, pubSubPublisher, cfg.PubSubIngestionTopic)
 	courseSvc := service.NewCourseService(courseRepo, lectureSvc)
 	summarySvc := service.NewSummaryService(summaryRepo)
 	explanationSvc := service.NewExplanationService(explanationRepo)
@@ -88,10 +104,10 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	courseHandler := handler.NewCourseHandler(courseSvc, validate)
 	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, summarySvc, explanationSvc, noteSvc, validate, cfg.S3URL, cfg.S3Bucket)
 
-	// 6. Initialize middleware
+	// 7. Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)
 
-	// 7. Create ServeMux router
+	// 8. Create ServeMux router
 	mux := http.NewServeMux()
 
 	// Create a subrouter for API v1 with the /api/v1 prefix
@@ -100,8 +116,8 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	courseHandler.RegisterRoutes(apiV1Mux, authMiddleware)
 	lectureHandler.RegisterRoutes(apiV1Mux, authMiddleware)
 
-	// Mount the API v1 routes under /api/v1
-	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiV1Mux))
+	// Mount the API v1 routes under /v1
+	mux.Handle("/v1/", http.StripPrefix("/v1", apiV1Mux))
 
 	// Add Swagger documentation
 	mux.HandleFunc("/swagger/swagger.json", func(w http.ResponseWriter, r *http.Request) {
@@ -109,11 +125,20 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	})
 	mux.Handle("/swagger/", http.StripPrefix("/swagger/", http.FileServer(http.Dir("./docs/swagger/swagger-ui"))))
 
-	// Handle /api and all its subpaths
+	// Redirect /api/* to /v1/* for backward compatibility
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
-		// Get the rest of the path after /api
-		restOfPath := r.URL.Path[4:] // Remove "/api" from the beginning
-		http.Redirect(w, r, "/api/v1"+restOfPath, http.StatusMovedPermanently)
+		rest := strings.TrimPrefix(r.URL.Path, "/api/")
+		http.Redirect(w, r, "/v1/"+rest, http.StatusMovedPermanently)
+	})
+
+	// Redirect all other root-level requests to /v1/{path}
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Avoid redirect loops by checking if already under /v1 or /swagger or /api
+		if strings.HasPrefix(r.URL.Path, "/v1/") || strings.HasPrefix(r.URL.Path, "/swagger/") || strings.HasPrefix(r.URL.Path, "/api/") {
+			http.NotFound(w, r)
+			return
+		}
+		http.Redirect(w, r, "/v1"+r.URL.Path, http.StatusMovedPermanently)
 	})
 
 	// 8. Apply CORS middleware
