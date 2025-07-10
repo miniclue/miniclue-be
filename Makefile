@@ -1,4 +1,4 @@
-.PHONY: all build run swagger clean fmt build-worker worker-ingestion worker-embedding worker-explanation worker-summary
+.PHONY: all build run swagger clean fmt build-worker worker-ingestion worker-embedding worker-explanation worker-summary lint build-setup-pubsub-local setup-pubsub-local deploy-pubsub
 
 # Default target
 all: build
@@ -17,14 +17,12 @@ build-setup-pubsub-local:
 
 # Run the setup for the local Pub/Sub emulator.
 # This will delete all existing topics and subscriptions and create new ones.
-.PHONY: setup-pubsub-local
 setup-pubsub-local: build-setup-pubsub-local
 	./bin/setup-pubsub-local
 
 # Deploy Pub/Sub resources to staging or production.
 # Usage: make deploy-pubsub env=staging
 #        make deploy-pubsub env=production
-.PHONY: deploy-pubsub
 deploy-pubsub:
 	./scripts/setup_pubsub.sh $(env)
 
@@ -32,6 +30,12 @@ deploy-pubsub:
 fmt:
 	@echo "Formatting code..."
 	go fmt ./...
+
+# Lint
+lint:
+	@echo "Linting code..."
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	golangci-lint run
 
 # Generate Swagger documentation
 swagger:

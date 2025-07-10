@@ -40,7 +40,11 @@ func main() {
 	if err != nil {
 		logger.Fatal().Msgf("Failed to build router: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			logger.Error().Msgf("Failed to close database connection: %v", err)
+		}
+	}()
 
 	// 3. Create HTTP server
 	srv := &http.Server{

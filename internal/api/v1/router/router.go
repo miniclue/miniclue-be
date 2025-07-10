@@ -87,11 +87,11 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 
 	// 6. Initialize repositories & services & handlers
 	userRepo := repository.NewUserRepo(db)
-	lectureRepo := repository.NewLectureRepository(db)
-	courseRepo := repository.NewCourseRepo(db)
+	lectureRepo := repository.NewLectureRepository(db, logger)
+	courseRepo := repository.NewCourseRepo(db, logger)
 	summaryRepo := repository.NewSummaryRepository(db)
-	explanationRepo := repository.NewExplanationRepository(db)
-	noteRepo := repository.NewNoteRepository(db)
+	explanationRepo := repository.NewExplanationRepository(db, logger)
+	noteRepo := repository.NewNoteRepository(db, logger)
 
 	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo)
 	lectureSvc := service.NewLectureService(lectureRepo, s3Client, cfg.S3Bucket, pubSubPublisher, cfg.PubSubIngestionTopic)
@@ -100,9 +100,9 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	explanationSvc := service.NewExplanationService(explanationRepo)
 	noteSvc := service.NewNoteService(noteRepo)
 
-	userHandler := handler.NewUserHandler(userSvc, validate)
-	courseHandler := handler.NewCourseHandler(courseSvc, validate)
-	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, summarySvc, explanationSvc, noteSvc, validate, cfg.S3URL, cfg.S3Bucket)
+	userHandler := handler.NewUserHandler(userSvc, validate, logger)
+	courseHandler := handler.NewCourseHandler(courseSvc, validate, logger)
+	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, summarySvc, explanationSvc, noteSvc, validate, cfg.S3URL, cfg.S3Bucket, logger)
 
 	// 7. Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)

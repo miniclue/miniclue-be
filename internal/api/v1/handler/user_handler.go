@@ -13,15 +13,21 @@ import (
 	"app/internal/service"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/rs/zerolog"
 )
 
 type UserHandler struct {
 	userService service.UserService
 	validate    *validator.Validate
+	logger      zerolog.Logger
 }
 
-func NewUserHandler(userService service.UserService, v *validator.Validate) *UserHandler {
-	return &UserHandler{userService: userService, validate: v}
+func NewUserHandler(userService service.UserService, v *validator.Validate, logger zerolog.Logger) *UserHandler {
+	return &UserHandler{
+		userService: userService,
+		validate:    v,
+		logger:      logger,
+	}
 }
 
 // RegisterRoutes mounts v1 user routes
@@ -104,7 +110,9 @@ func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	// 7. Return response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 // getUser godoc
@@ -143,7 +151,9 @@ func (h *UserHandler) getUser(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: user.CreatedAt,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 // getUserCourses godoc
@@ -190,7 +200,9 @@ func (h *UserHandler) getUserCourses(w http.ResponseWriter, r *http.Request) {
 	// 4. Return response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(courseDTOs)
+	if err := json.NewEncoder(w).Encode(courseDTOs); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 // getRecentLectures godoc
@@ -256,5 +268,7 @@ func (h *UserHandler) getRecentLectures(w http.ResponseWriter, r *http.Request) 
 	// 5. Return response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(lectureDTOs)
+	if err := json.NewEncoder(w).Encode(lectureDTOs); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }

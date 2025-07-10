@@ -5,6 +5,8 @@ import (
 	"database/sql"
 
 	"app/internal/model"
+
+	"github.com/rs/zerolog"
 )
 
 // CourseRepository defines the interface for interacting with course data
@@ -20,12 +22,13 @@ type CourseRepository interface {
 }
 
 type courseRepo struct {
-	db *sql.DB
+	db     *sql.DB
+	logger zerolog.Logger
 }
 
 // NewCourseRepo creates a new CourseRepository
-func NewCourseRepo(db *sql.DB) CourseRepository {
-	return &courseRepo{db: db}
+func NewCourseRepo(db *sql.DB, logger zerolog.Logger) CourseRepository {
+	return &courseRepo{db: db, logger: logger}
 }
 
 // GetCoursesByUserID retrieves all courses associated with a given user ID
@@ -42,7 +45,11 @@ func (r *courseRepo) GetCoursesByUserID(ctx context.Context, userID string) ([]m
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			r.logger.Error().Err(err).Msg("Failed to close rows")
+		}
+	}()
 
 	for rows.Next() {
 		var course model.Course

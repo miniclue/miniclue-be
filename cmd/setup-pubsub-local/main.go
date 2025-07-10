@@ -53,7 +53,11 @@ func main() {
 	if err != nil {
 		logger.Fatal().Msgf("Failed to create Pub/Sub client: %v", err)
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			logger.Error().Msgf("Failed to close pubsub client: %v", err)
+		}
+	}()
 
 	// --- Execute Local Reset and Creation ---
 	resetLocalEmulator(ctx, client, logger)

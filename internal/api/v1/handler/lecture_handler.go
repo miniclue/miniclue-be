@@ -11,6 +11,7 @@ import (
 	"app/internal/service"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/rs/zerolog"
 )
 
 // LectureHandler handles flat lecture endpoints
@@ -24,6 +25,7 @@ type LectureHandler struct {
 	validate           *validator.Validate
 	s3BaseURL          string
 	s3Bucket           string
+	logger             zerolog.Logger
 }
 
 // NewLectureHandler creates a new LectureHandler
@@ -36,6 +38,7 @@ func NewLectureHandler(
 	validate *validator.Validate,
 	s3BaseURL string,
 	s3Bucket string,
+	logger zerolog.Logger,
 ) *LectureHandler {
 	return &LectureHandler{
 		lectureService:     lectureService,
@@ -46,6 +49,7 @@ func NewLectureHandler(
 		validate:           validate,
 		s3BaseURL:          s3BaseURL,
 		s3Bucket:           s3Bucket,
+		logger:             logger,
 	}
 }
 
@@ -142,7 +146,9 @@ func (h *LectureHandler) getLecture(w http.ResponseWriter, r *http.Request) {
 		AccessedAt:  lecture.AccessedAt,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 // updateLecture godoc
@@ -210,7 +216,9 @@ func (h *LectureHandler) updateLecture(w http.ResponseWriter, r *http.Request) {
 		AccessedAt:  lecture.AccessedAt,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 // deleteLecture godoc
@@ -330,7 +338,9 @@ func (h *LectureHandler) listLectures(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 // uploadLecture godoc
@@ -402,7 +412,9 @@ func (h *LectureHandler) uploadLecture(w http.ResponseWriter, r *http.Request) {
 			title = header.Filename
 		}
 		lec, err := h.lectureService.CreateLectureWithPDF(r.Context(), courseID, userID, title, f, header)
-		f.Close()
+		if err := f.Close(); err != nil {
+			h.logger.Warn().Err(err).Msg("Failed to close uploaded file part")
+		}
 		if err != nil {
 			http.Error(w, "Failed to create lecture: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -414,8 +426,9 @@ func (h *LectureHandler) uploadLecture(w http.ResponseWriter, r *http.Request) {
 	}
 	// Return array of responses
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(results)
+	if err := json.NewEncoder(w).Encode(results); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 // getLectureSummary godoc
@@ -463,7 +476,9 @@ func (h *LectureHandler) getLectureSummary(w http.ResponseWriter, r *http.Reques
 	}
 	resp := dto.LectureSummaryResponseDTO{LectureID: lectureID, Content: content}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 // listLectureExplanations godoc
@@ -535,7 +550,9 @@ func (h *LectureHandler) listLectureExplanations(w http.ResponseWriter, r *http.
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 // listLectureNotes godoc
@@ -601,7 +618,9 @@ func (h *LectureHandler) listLectureNotes(w http.ResponseWriter, r *http.Request
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 // updateLectureNote godoc
@@ -665,7 +684,9 @@ func (h *LectureHandler) updateLectureNote(w http.ResponseWriter, r *http.Reques
 		UpdatedAt: updated.UpdatedAt,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 // createLectureNote godoc
@@ -736,7 +757,9 @@ func (h *LectureHandler) createLectureNote(w http.ResponseWriter, r *http.Reques
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 // getSignedURL godoc
@@ -778,5 +801,7 @@ func (h *LectureHandler) getSignedURL(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := dto.SignedURLResponseDTO{URL: url}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
