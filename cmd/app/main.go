@@ -46,9 +46,15 @@ func main() {
 		}
 	}()
 
+	// Determine port for HTTP server.
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = cfg.Port
+	}
+
 	// 3. Create HTTP server
 	srv := &http.Server{
-		Addr:         ":" + cfg.Port,
+		Addr:         ":" + port,
 		Handler:      r,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -57,7 +63,7 @@ func main() {
 
 	// 4. Start server in a goroutine
 	go func() {
-		logger.Info().Msgf("🚀 Server starting on port %s", cfg.Port)
+		logger.Info().Msgf("🚀 Server starting on port %s", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Fatal().Msgf("Listen: %s\n", err)
 		}
