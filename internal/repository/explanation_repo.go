@@ -5,6 +5,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/rs/zerolog"
 )
 
 // ExplanationRepository defines explanation-related DB operations
@@ -14,12 +16,13 @@ type ExplanationRepository interface {
 
 // explanationRepository is the DB implementation of ExplanationRepository
 type explanationRepository struct {
-	db *sql.DB
+	db     *sql.DB
+	logger zerolog.Logger
 }
 
 // NewExplanationRepository creates a new ExplanationRepository
-func NewExplanationRepository(db *sql.DB) ExplanationRepository {
-	return &explanationRepository{db: db}
+func NewExplanationRepository(db *sql.DB, logger zerolog.Logger) ExplanationRepository {
+	return &explanationRepository{db: db, logger: logger}
 }
 
 // GetExplanationsByLectureID retrieves explanation records for a given lecture with pagination
@@ -41,7 +44,11 @@ func (r *explanationRepository) GetExplanationsByLectureID(ctx context.Context, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query explanations: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			r.logger.Error().Err(err).Msg("Failed to close rows")
+		}
+	}()
 
 	explanations := []model.Explanation{}
 	for rows.Next() {

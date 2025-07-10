@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"app/internal/model"
+
+	"github.com/rs/zerolog"
 )
 
 // NoteRepository defines note-related DB operations
@@ -22,12 +24,13 @@ type NoteRepository interface {
 
 // noteRepository is the DB implementation of NoteRepository
 type noteRepository struct {
-	db *sql.DB
+	db     *sql.DB
+	logger zerolog.Logger
 }
 
 // NewNoteRepository creates a new NoteRepository
-func NewNoteRepository(db *sql.DB) NoteRepository {
-	return &noteRepository{db: db}
+func NewNoteRepository(db *sql.DB, logger zerolog.Logger) NoteRepository {
+	return &noteRepository{db: db, logger: logger}
 }
 
 // GetNotesByLectureID retrieves note records for a given lecture with pagination
@@ -37,7 +40,11 @@ func (r *noteRepository) GetNotesByLectureID(ctx context.Context, lectureID stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to query notes: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			r.logger.Error().Err(err).Msg("Failed to close rows")
+		}
+	}()
 
 	notes := []model.Note{}
 	for rows.Next() {

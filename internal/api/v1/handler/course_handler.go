@@ -11,19 +11,22 @@ import (
 	"app/internal/service"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/rs/zerolog"
 )
 
 // CourseHandler handles course-related endpoints
 type CourseHandler struct {
 	courseService service.CourseService
 	validate      *validator.Validate
+	logger        zerolog.Logger
 }
 
 // NewCourseHandler creates a new CourseHandler
-func NewCourseHandler(courseService service.CourseService, validate *validator.Validate) *CourseHandler {
+func NewCourseHandler(courseService service.CourseService, validate *validator.Validate, logger zerolog.Logger) *CourseHandler {
 	return &CourseHandler{
 		courseService: courseService,
 		validate:      validate,
+		logger:        logger,
 	}
 }
 
@@ -95,7 +98,9 @@ func (h *CourseHandler) createCourse(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 func (h *CourseHandler) handleCourse(w http.ResponseWriter, r *http.Request) {
@@ -158,7 +163,9 @@ func (h *CourseHandler) getCourse(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:   course.UpdatedAt,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 // updateCourse godoc
@@ -229,7 +236,9 @@ func (h *CourseHandler) updateCourse(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:   updated.UpdatedAt,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
 }
 
 // deleteCourse godoc

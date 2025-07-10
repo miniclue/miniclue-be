@@ -1,0 +1,103 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy-staging:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment: Staging
+    permissions:
+      contents: "read"
+      id-token: "write"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
+
+      - name: Build and Push Docker Image
+        env:
+          IMAGE_URL: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/miniclue-be:${{ github.sha }}
+        run: |
+          docker build -t $IMAGE_URL .
+          docker push $IMAGE_URL
+
+      - name: Deploy to Cloud Run (Staging)
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: miniclue-be-staging
+          image: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/miniclue-be:${{ github.sha }}
+          region: ${{ secrets.GCP_REGION }}
+          flags: "--allow-unauthenticated"
+
+      - name: Show Cloud Run URL
+        run: echo "Deployed to ${{ steps.deploy.outputs.url }}"
+
+  deploy-production:
+    if: github.event_name == 'workflow_dispatch'
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: Production
+    permissions:
+      contents: "read"
+      id-token: "write"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
+
+      - name: Promote Image from Staging to Production Registry
+        env:
+          SOURCE_IMAGE: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.STAGING_GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/miniclue-be:${{ github.sha }}
+          DESTINATION_IMAGE: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/miniclue-be:${{ github.sha }}
+        run: |
+          echo "Pulling image from staging: $SOURCE_IMAGE"
+          docker pull $SOURCE_IMAGE
+          echo "Tagging image for production: $DESTINATION_IMAGE"
+          docker tag $SOURCE_IMAGE $DESTINATION_IMAGE
+          echo "Pushing image to production registry"
+          docker push $DESTINATION_IMAGE
+
+      - name: Deploy to Cloud Run (Production)
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: miniclue-be-production
+          image: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/miniclue-be:${{ github.sha }}
+          region: ${{ secrets.GCP_REGION }}
+          flags: "--allow-unauthenticated"
+
+      - name: Show Cloud Run URL
+        run: echo "Deployed to ${{ steps.deploy.outputs.url }}"

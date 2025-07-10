@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"app/internal/model"
+
+	"github.com/rs/zerolog"
 )
 
 type LectureRepository interface {
@@ -20,11 +22,12 @@ type LectureRepository interface {
 }
 
 type lectureRepository struct {
-	db *sql.DB
+	db     *sql.DB
+	logger zerolog.Logger
 }
 
-func NewLectureRepository(db *sql.DB) LectureRepository {
-	return &lectureRepository{db: db}
+func NewLectureRepository(db *sql.DB, logger zerolog.Logger) LectureRepository {
+	return &lectureRepository{db: db, logger: logger}
 }
 
 func (r *lectureRepository) GetLecturesByUserID(ctx context.Context, userID string, limit, offset int) ([]model.Lecture, error) {
@@ -40,7 +43,11 @@ func (r *lectureRepository) GetLecturesByUserID(ctx context.Context, userID stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to query recent lectures: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			r.logger.Error().Err(err).Msg("Failed to close rows")
+		}
+	}()
 
 	var lectures []model.Lecture
 	for rows.Next() {
@@ -81,7 +88,11 @@ func (r *lectureRepository) GetLecturesByCourseID(ctx context.Context, courseID 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query lectures by course: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			r.logger.Error().Err(err).Msg("Failed to close rows")
+		}
+	}()
 
 	var lectures []model.Lecture
 	for rows.Next() {
@@ -205,7 +216,9 @@ func (r *lectureRepository) DeletePendingJobs(ctx context.Context, lectureID str
 			fmt.Printf("failed to delete pending jobs from %s: %v\n", q, err)
 			continue
 		}
-		rows.Close()
+		if err := rows.Close(); err != nil {
+			r.logger.Error().Err(err).Msgf("failed to close rows for queue %s", q)
+		}
 	}
 	return nil
 }
