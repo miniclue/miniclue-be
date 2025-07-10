@@ -42,7 +42,7 @@ jobs:
         id: deploy
         uses: google-github-actions/deploy-cloudrun@v2
         with:
-          service: miniclue-be-production
+          service: miniclue-be-prod
           image: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/miniclue-be:${{ github.ref_name }}
           region: ${{ secrets.GCP_REGION }}
           flags: "--allow-unauthenticated"
