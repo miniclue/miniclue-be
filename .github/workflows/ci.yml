@@ -9,6 +9,8 @@ jobs:
   lint-and-test:
     name: Lint and Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,18 +21,8 @@ jobs:
           go-version: "1.24"
           cache: true
 
-      - name: Cache golangci-lint
-        uses: actions/cache@v4
-        with:
-          path: $(go env GOPATH)/bin/golangci-lint
-          key: golangci-lint-v2.2.1
-
-      - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.2.1
-        if: steps.cache_golangci_lint.outputs.cache-hit != 'true'
-
       - name: Run golangci-lint
-        run: $(go env GOPATH)/bin/golangci-lint run ./...
+        uses: golangci/golangci-lint-action@v8
 
       - name: Run tests
         run: go test -v ./...
