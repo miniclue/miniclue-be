@@ -64,7 +64,7 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 
 	// 3. Initialize S3 client
 	s3Config, err := awsconfig.LoadDefaultConfig(context.TODO(),
-		awsconfig.WithRegion(cfg.S3Region),
+		awsconfig.WithRegion(""),
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cfg.S3AccessKey, cfg.S3SecretKey, "")),
 	)
 	if err != nil {
