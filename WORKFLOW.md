@@ -170,7 +170,7 @@ The new system is designed around two parallel processing tracks that start afte
 
 ## Step 2: Ingestion and Dispatch Workflow
 
-- **Trigger:** A message arrives from the `ingestion` topic, pushed to your Python API (`/ingest`).
+- **Trigger:** A message arrives from the `ingestion` topic, pushed to your Python API (`/ingestion`).
 - **Action:** This service is now a fast, mechanical dispatcher. It makes no external AI calls.
 
   1.  It receives the lecture ID, **verifies the lecture exists in the database**, and updates its status to `parsing`.
