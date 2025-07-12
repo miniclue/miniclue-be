@@ -24,6 +24,13 @@ CREATE TYPE slide_image_type AS ENUM (
   'full_slide_render'
 );
 
+-- Status for dead-letter queue messages
+CREATE TYPE dlq_message_status AS ENUM (
+  'unprocessed',
+  'processed',
+  'ignored'
+);
+
 -------------------------------------------------------------------------------
 -- 1. Course Table
 -------------------------------------------------------------------------------
@@ -195,7 +202,23 @@ CREATE INDEX IF NOT EXISTS idx_notes_user_id    ON notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_lecture_id ON notes(lecture_id);
 
 -------------------------------------------------------------------------------
--- 11. Row-Level Security (RLS) Policies
+-- 11. Dead-Letter Queue Table
+-------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dead_letter_messages (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  subscription_name   TEXT NOT NULL,
+  message_id          TEXT NOT NULL,
+  payload             JSONB NOT NULL,
+  attributes          JSONB,
+  status              dlq_message_status NOT NULL DEFAULT 'unprocessed',
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_dead_letter_messages_status ON dead_letter_messages(status);
+CREATE INDEX IF NOT EXISTS idx_dead_letter_messages_created_at ON dead_letter_messages(created_at);
+
+-------------------------------------------------------------------------------
+-- 12. Row-Level Security (RLS) Policies
 -------------------------------------------------------------------------------
 
 -- Enable RLS for all relevant tables
@@ -209,6 +232,7 @@ ALTER TABLE public.summaries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.explanations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.slide_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.dead_letter_messages ENABLE ROW LEVEL SECURITY;
 
 -- 1. courses: Users can manage their own courses fully.
 CREATE POLICY "Allow all access to own courses" ON public.courses
@@ -273,3 +297,10 @@ CREATE POLICY "Allow all access to own notes" ON public.notes
     auth.uid() = user_id AND
     EXISTS (SELECT 1 FROM lectures WHERE lectures.id = notes.lecture_id AND lectures.user_id = auth.uid())
   );
+
+-- 11. dead_letter_messages: No access for regular users.
+-- These are internal records for backend debugging, accessible only via service_role.
+CREATE POLICY "Deny all access to dead_letter_messages" ON public.dead_letter_messages
+  FOR ALL
+  USING (false)
+  WITH CHECK (false);

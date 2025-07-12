@@ -94,6 +94,7 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	summaryRepo := repository.NewSummaryRepository(db)
 	explanationRepo := repository.NewExplanationRepository(db, logger)
 	noteRepo := repository.NewNoteRepository(db, logger)
+	dlqRepo := repository.NewDLQRepository(db)
 
 	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo)
 	lectureSvc := service.NewLectureService(lectureRepo, s3Client, cfg.S3Bucket, pubSubPublisher, cfg.PubSubIngestionTopic)
@@ -101,13 +102,16 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	summarySvc := service.NewSummaryService(summaryRepo)
 	explanationSvc := service.NewExplanationService(explanationRepo)
 	noteSvc := service.NewNoteService(noteRepo)
+	dlqSvc := service.NewDLQService(dlqRepo)
 
 	userHandler := handler.NewUserHandler(userSvc, validate, logger)
 	courseHandler := handler.NewCourseHandler(courseSvc, validate, logger)
 	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, summarySvc, explanationSvc, noteSvc, validate, cfg.S3URL, cfg.S3Bucket, logger)
+	dlqHandler := handler.NewDLQHandler(dlqSvc, logger)
 
 	// 7. Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)
+	pubsubAuthMiddleware := middleware.PubSubAuthMiddleware(cfg.AppEnv, cfg.DLQEndpointURL, cfg.PubSubPushServiceAccountEmail, logger)
 
 	// 8. Create ServeMux router
 	mux := http.NewServeMux()
@@ -117,6 +121,7 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 	userHandler.RegisterRoutes(apiV1Mux, authMiddleware)
 	courseHandler.RegisterRoutes(apiV1Mux, authMiddleware)
 	lectureHandler.RegisterRoutes(apiV1Mux, authMiddleware)
+	dlqHandler.RegisterRoutes(apiV1Mux, pubsubAuthMiddleware)
 
 	// Mount the API v1 routes under /v1
 	mux.Handle("/v1/", http.StripPrefix("/v1", apiV1Mux))

@@ -7,7 +7,7 @@
 set -e # Exit immediately if a command exits with a non-zero status.
 
 # --- Configuration ---
-TOPICS=("ingestion" "embedding" "explanation" "summary")
+TOPICS=("ingestion" "embedding" "explanation" "summary" "image-analysis")
 SEVEN_DAYS_S="604800s" # 7 days in seconds for gcloud
 THIRTY_ONE_DAYS="31d"
 ACK_DEADLINE=180

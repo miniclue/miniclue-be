@@ -101,7 +101,8 @@ The new system is designed around two parallel processing tracks that start afte
 
 ```
   {
-  "lecture_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  "lecture_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "storage_path": "lectures/55bdef4b-b9ac-4783-b8e4-87b47675333e/original.pdf"
   }
 ```
 

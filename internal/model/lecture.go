@@ -1,8 +1,6 @@
 package model
 
-import (
-	"time"
-)
+import "time"
 
 // Lecture represents the metadata for an uploaded PDF lecture.
 type Lecture struct {
