@@ -55,26 +55,33 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 -- 3. Lecture Table
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS lectures (
-  id                     UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id                UUID            NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  course_id              UUID            NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-  title                  TEXT            NOT NULL,
-  storage_path           TEXT            NOT NULL DEFAULT '',
-  status                 lecture_status  NOT NULL DEFAULT 'uploading',
-  error_details          JSONB,
+  id                        UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id                   UUID            NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  course_id                 UUID            NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  title                     TEXT            NOT NULL,
+  storage_path              TEXT            NOT NULL DEFAULT '',
+  status                    lecture_status  NOT NULL DEFAULT 'uploading',
+
+  -- Error details for each processing track
+  explanation_error_details JSONB           DEFAULT NULL,
+  search_error_details      JSONB           DEFAULT NULL,
+
   -- Explanation track progress
-  total_slides           INT             NOT NULL DEFAULT 0,
-  processed_slides       INT             NOT NULL DEFAULT 0,
+  total_slides              INT             NOT NULL DEFAULT 0,
+  processed_slides          INT             NOT NULL DEFAULT 0,
+
   -- Search-Enrichment track progress and rendezvous flag
-  total_sub_images       INT             NOT NULL DEFAULT 0,
-  processed_sub_images   INT             NOT NULL DEFAULT 0,
-  embeddings_complete    BOOLEAN         NOT NULL DEFAULT FALSE,
+  total_sub_images          INT             NOT NULL DEFAULT 0,
+  processed_sub_images      INT             NOT NULL DEFAULT 0,
+  embeddings_complete       BOOLEAN         NOT NULL DEFAULT FALSE,
+
   -- Timestamps
-  created_at             TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-  updated_at             TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-  accessed_at            TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-  completed_at           TIMESTAMPTZ
+  created_at                TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+  updated_at                TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+  accessed_at               TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+  completed_at              TIMESTAMPTZ     DEFAULT NULL
 );
+
 CREATE INDEX IF NOT EXISTS idx_lectures_user_id   ON lectures(user_id);
 CREATE INDEX IF NOT EXISTS idx_lectures_course_id ON lectures(course_id);
 
