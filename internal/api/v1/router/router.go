@@ -20,7 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awsmiddleware "github.com/aws/smithy-go/middleware"
 	"github.com/go-playground/validator/v10"
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rs/cors"
 )
 
@@ -45,7 +45,19 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 		}
 		dsn += separator + "sslmode=disable"
 	}
-	db, err := sql.Open("postgres", dsn)
+	// For non-development environments that use a transaction pooler like pgbouncer,
+	// we must use the simple query protocol to avoid issues with server-side prepared statements.
+	if cfg.Environment != "development" {
+		if !strings.Contains(dsn, "prefer_simple_protocol") {
+			separator := "&"
+			if !strings.Contains(dsn, "?") {
+				separator = "?"
+			}
+			dsn += separator + "prefer_simple_protocol=true"
+		}
+	}
+
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		logger.Fatal().Msgf("Failed to open DB connection: %v", err)
 		return nil, nil, err
