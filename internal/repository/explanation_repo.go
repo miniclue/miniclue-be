@@ -27,20 +27,9 @@ func NewExplanationRepository(db *sql.DB, logger zerolog.Logger) ExplanationRepo
 
 // GetExplanationsByLectureID retrieves explanation records for a given lecture with pagination
 func (r *explanationRepository) GetExplanationsByLectureID(ctx context.Context, lectureID string, limit, offset int) ([]model.Explanation, error) {
-	baseQuery := `SELECT id, lecture_id, slide_number, content, created_at, updated_at FROM explanations WHERE lecture_id = $1 ORDER BY slide_number`
-	var (
-		rows *sql.Rows
-		err  error
-	)
-	if limit > 0 {
-		query := baseQuery + " LIMIT $2 OFFSET $3"
-		rows, err = r.db.QueryContext(ctx, query, lectureID, limit, offset)
-	} else if offset > 0 {
-		query := baseQuery + " OFFSET $2"
-		rows, err = r.db.QueryContext(ctx, query, lectureID, offset)
-	} else {
-		rows, err = r.db.QueryContext(ctx, baseQuery, lectureID)
-	}
+	query := fmt.Sprintf(`SELECT id, lecture_id, slide_number, content, created_at, updated_at FROM explanations WHERE lecture_id = $1 ORDER BY slide_number LIMIT %d OFFSET %d`, limit, offset)
+
+	rows, err := r.db.QueryContext(ctx, query, lectureID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query explanations: %w", err)
 	}

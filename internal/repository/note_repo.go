@@ -35,8 +35,8 @@ func NewNoteRepository(db *sql.DB, logger zerolog.Logger) NoteRepository {
 
 // GetNotesByLectureID retrieves note records for a given lecture with pagination
 func (r *noteRepository) GetNotesByLectureID(ctx context.Context, lectureID string, limit, offset int) ([]model.Note, error) {
-	query := `SELECT id, lecture_id, content, created_at, updated_at FROM notes WHERE lecture_id = $1 ORDER BY created_at LIMIT $2 OFFSET $3`
-	rows, err := r.db.QueryContext(ctx, query, lectureID, limit, offset)
+	query := fmt.Sprintf(`SELECT id, lecture_id, content, created_at, updated_at FROM notes WHERE lecture_id = $1 ORDER BY created_at LIMIT %d OFFSET %d`, limit, offset)
+	rows, err := r.db.QueryContext(ctx, query, lectureID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query notes: %w", err)
 	}

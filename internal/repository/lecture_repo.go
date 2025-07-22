@@ -29,15 +29,15 @@ func NewLectureRepository(db *sql.DB, logger zerolog.Logger) LectureRepository {
 }
 
 func (r *lectureRepository) GetLecturesByUserID(ctx context.Context, userID string, limit, offset int) ([]model.Lecture, error) {
-	query := `
+	query := fmt.Sprintf(`
 		SELECT id, user_id, course_id, title, storage_path, status, created_at, updated_at, accessed_at
 		FROM lectures
 		WHERE user_id = $1
 		ORDER BY accessed_at DESC
-		LIMIT $2 OFFSET $3
-	`
+		LIMIT %d OFFSET %d
+	`, limit, offset)
 
-	rows, err := r.db.QueryContext(ctx, query, userID, limit, offset)
+	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query recent lectures: %w", err)
 	}
@@ -74,15 +74,15 @@ func (r *lectureRepository) GetLecturesByUserID(ctx context.Context, userID stri
 }
 
 func (r *lectureRepository) GetLecturesByCourseID(ctx context.Context, courseID string, limit, offset int) ([]model.Lecture, error) {
-	query := `
+	query := fmt.Sprintf(`
 		SELECT id, user_id, course_id, title, storage_path, status, created_at, updated_at, accessed_at
 		FROM lectures
 		WHERE course_id = $1
 		ORDER BY accessed_at DESC
-		LIMIT $2 OFFSET $3
-	`
+		LIMIT %d OFFSET %d
+	`, limit, offset)
 
-	rows, err := r.db.QueryContext(ctx, query, courseID, limit, offset)
+	rows, err := r.db.QueryContext(ctx, query, courseID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query lectures by course: %w", err)
 	}

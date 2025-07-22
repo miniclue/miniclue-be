@@ -520,8 +520,8 @@ func (h *LectureHandler) listLectureExplanations(w http.ResponseWriter, r *http.
 	}
 	// parse query params
 	q := r.URL.Query()
-	// default to no limit (return all explanations)
-	limit := 0
+	// default to a high limit to fetch all if not specified
+	limit := 1000
 	if l := q.Get("limit"); l != "" {
 		if v, err := strconv.Atoi(l); err == nil && v > 0 {
 			limit = v
@@ -557,7 +557,7 @@ func (h *LectureHandler) listLectureExplanations(w http.ResponseWriter, r *http.
 
 // listLectureNotes godoc
 // @Summary List lecture notes
-// @Description Retrieves notes for a lecture with pagination
+// @Description Retrieves notes for a lecture. If no limit is specified, all notes are returned.
 // @Tags lectures
 // @Produce json
 // @Param lectureId path string true "Lecture ID"
@@ -590,7 +590,7 @@ func (h *LectureHandler) listLectureNotes(w http.ResponseWriter, r *http.Request
 		return
 	}
 	q := r.URL.Query()
-	limit := 10
+	limit := 1000
 	if l := q.Get("limit"); l != "" {
 		if v, err := strconv.Atoi(l); err == nil && v > 0 {
 			limit = v
