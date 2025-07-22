@@ -111,7 +111,8 @@ func New(cfg *config.Config) (http.Handler, *sql.DB, error) {
 
 	// 7. Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)
-	pubsubAuthMiddleware := middleware.PubSubAuthMiddleware(cfg.AppEnv, cfg.DLQEndpointURL, cfg.PubSubPushServiceAccountEmail, logger)
+	isLocalDev := cfg.PubSubEmulatorHost != ""
+	pubsubAuthMiddleware := middleware.PubSubAuthMiddleware(isLocalDev, cfg.DLQEndpointURL, cfg.PubSubPushServiceAccountEmail, logger)
 
 	// 8. Create ServeMux router
 	mux := http.NewServeMux()

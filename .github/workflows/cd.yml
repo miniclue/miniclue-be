@@ -74,7 +74,6 @@ jobs:
           flags: "--allow-unauthenticated"
           env_vars: |
             ENV=staging
-            APP_ENV=staging
             DB_CONNECTION_STRING=${{ secrets.DB_CONNECTION_STRING }}
             SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}
             SUPABASE_S3_URL=${{ secrets.SUPABASE_S3_URL }}

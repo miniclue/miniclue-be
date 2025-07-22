@@ -92,13 +92,13 @@ To run the setup:
 
 ```bash
 # For local development (resets all topics/subscriptions)
-make setup-pubsub env=local
+make setup-pubsub-local
 
 # For staging (creates or updates resources, does not delete)
-make setup-pubsub env=staging
+make deploy-pubsub env=staging
 
 # For production (creates or updates resources, does not delete)
-make setup-pubsub env=production
+make deploy-pubsub env=production
 ```
 
 ### 3. Run the API Server

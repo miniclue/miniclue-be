@@ -31,9 +31,6 @@ type Config struct {
 	// API
 	Port string `envconfig:"PORT" default:"8080"`
 
-	// App Environment
-	AppEnv string `envconfig:"APP_ENV" default:"local"`
-
 	// Pub/Sub
 	PubSubIngestionTopic string `envconfig:"PUBSUB_INGESTION_TOPIC" default:"ingestion"`
 	PubSubEmulatorHost   string `envconfig:"PUBSUB_EMULATOR_HOST"`

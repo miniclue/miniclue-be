@@ -10,12 +10,12 @@ import (
 )
 
 // PubSubAuthMiddleware validates a JWT from a Pub/Sub push request.
-// It bypasses authentication if the appEnv is "local".
-func PubSubAuthMiddleware(appEnv, audience, expectedEmail string, logger zerolog.Logger) func(http.Handler) http.Handler {
+// It bypasses authentication if isLocalDev is true.
+func PubSubAuthMiddleware(isLocalDev bool, audience, expectedEmail string, logger zerolog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// For local development, bypass the authentication check.
-			if appEnv == "local" {
+			if isLocalDev {
 				logger.Debug().Msg("Skipping Pub/Sub authentication for local environment")
 				next.ServeHTTP(w, r)
 				return

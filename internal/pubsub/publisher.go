@@ -25,22 +25,25 @@ func NewPublisher(ctx context.Context, cfg *config.Config) (*PubSubPublisher, er
 	var opts []option.ClientOption
 	var projectID string
 
-	switch cfg.AppEnv {
-	case "local":
+	// Determine environment based on PubSubEmulatorHost presence
+	if cfg.PubSubEmulatorHost != "" {
+		// Local environment
 		projectID = cfg.GCPProjectIDLocal
-		if cfg.PubSubEmulatorHost != "" {
-			opts = append(opts, option.WithEndpoint(cfg.PubSubEmulatorHost), option.WithoutAuthentication())
+		opts = append(opts, option.WithEndpoint(cfg.PubSubEmulatorHost), option.WithoutAuthentication())
+	} else {
+		// Production/Staging environment - use staging by default
+		// In production, you would typically set the appropriate project ID via environment variables
+		if cfg.GCPProjectIDStaging != "" {
+			projectID = cfg.GCPProjectIDStaging
+		} else if cfg.GCPProjectIDProd != "" {
+			projectID = cfg.GCPProjectIDProd
+		} else {
+			return nil, fmt.Errorf("no GCP Project ID configured for staging or production")
 		}
-	case "staging":
-		projectID = cfg.GCPProjectIDStaging
-	case "production":
-		projectID = cfg.GCPProjectIDProd
-	default:
-		return nil, fmt.Errorf("invalid APP_ENV specified: '%s'", cfg.AppEnv)
 	}
 
 	if projectID == "" {
-		return nil, fmt.Errorf("GCP Project ID for environment '%s' is not set", cfg.AppEnv)
+		return nil, fmt.Errorf("GCP Project ID is not set for the current environment")
 	}
 
 	client, err := pubsub.NewClient(ctx, projectID, opts...)
