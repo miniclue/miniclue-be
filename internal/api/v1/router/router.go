@@ -110,7 +110,7 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	dlqRepo := repository.NewDLQRepository(pool)
 
 	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo, logger)
-	lectureSvc := service.NewLectureService(lectureRepo, s3Client, cfg.S3Bucket, pubSubPublisher, cfg.PubSubIngestionTopic, logger)
+	lectureSvc := service.NewLectureService(lectureRepo, userRepo, s3Client, cfg.S3Bucket, pubSubPublisher, cfg.PubSubIngestionTopic, logger)
 	courseSvc := service.NewCourseService(courseRepo, lectureSvc, logger)
 	summarySvc := service.NewSummaryService(summaryRepo, logger)
 	explanationSvc := service.NewExplanationService(explanationRepo, logger)

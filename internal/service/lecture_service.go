@@ -33,6 +33,7 @@ type LectureService interface {
 // lectureService is the implementation of LectureService
 type lectureService struct {
 	repo           repository.LectureRepository
+	userRepo       repository.UserRepository
 	s3Client       *s3.Client
 	bucketName     string
 	publisher      pubsub.Publisher
@@ -41,9 +42,10 @@ type lectureService struct {
 }
 
 // NewLectureService creates a new LectureService
-func NewLectureService(repo repository.LectureRepository, s3Client *s3.Client, bucketName string, publisher pubsub.Publisher, ingestionTopic string, logger zerolog.Logger) LectureService {
+func NewLectureService(repo repository.LectureRepository, userRepo repository.UserRepository, s3Client *s3.Client, bucketName string, publisher pubsub.Publisher, ingestionTopic string, logger zerolog.Logger) LectureService {
 	return &lectureService{
 		repo:           repo,
+		userRepo:       userRepo,
 		s3Client:       s3Client,
 		bucketName:     bucketName,
 		publisher:      publisher,
@@ -174,13 +176,31 @@ func (s *lectureService) CreateLectureWithPDF(ctx context.Context, courseID, use
 		return nil, fmt.Errorf("failed to update lecture with pdf url and status: %w", err)
 	}
 
-	// 4. Publish ingestion job to Pub/Sub
+	// 4. Publish ingestion job to Pub/Sub, enriched with user info for tracking
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		s.lectureLogger.Error().Err(err).Str("user_id", userID).Msg("Failed to fetch user for ingestion")
+	}
+	// Default customer identifier is the user ID
+	customerIdentifier := userID
+	name := ""
+	email := ""
+	if user != nil {
+		name = user.Name
+		email = user.Email
+	}
 	payload := struct {
-		LectureID   string `json:"lecture_id"`
-		StoragePath string `json:"storage_path"`
+		LectureID          string `json:"lecture_id"`
+		StoragePath        string `json:"storage_path"`
+		CustomerIdentifier string `json:"customer_identifier"`
+		Name               string `json:"name"`
+		Email              string `json:"email"`
 	}{
-		LectureID:   createdLecture.ID,
-		StoragePath: storagePath,
+		LectureID:          createdLecture.ID,
+		StoragePath:        storagePath,
+		CustomerIdentifier: customerIdentifier,
+		Name:               name,
+		Email:              email,
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {
