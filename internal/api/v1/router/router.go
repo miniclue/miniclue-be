@@ -108,14 +108,16 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	explanationRepo := repository.NewExplanationRepository(pool)
 	noteRepo := repository.NewNoteRepository(pool)
 	dlqRepo := repository.NewDLQRepository(pool)
+	subscriptionRepo := repository.NewSubscriptionRepo(pool)
 
-	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo, logger)
+	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo, subscriptionRepo, logger)
 	lectureSvc := service.NewLectureService(lectureRepo, userRepo, s3Client, cfg.S3Bucket, pubSubPublisher, cfg.PubSubIngestionTopic, logger)
 	courseSvc := service.NewCourseService(courseRepo, lectureSvc, logger)
 	summarySvc := service.NewSummaryService(summaryRepo, logger)
 	explanationSvc := service.NewExplanationService(explanationRepo, logger)
 	noteSvc := service.NewNoteService(noteRepo, logger)
 	dlqSvc := service.NewDLQService(dlqRepo, logger)
+	subscriptionSvc := service.NewSubscriptionService(subscriptionRepo)
 
 	userHandler := handler.NewUserHandler(userSvc, validate, logger)
 	courseHandler := handler.NewCourseHandler(courseSvc, validate, logger)
@@ -126,6 +128,7 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)
 	isLocalDev := cfg.PubSubEmulatorHost != ""
 	pubsubAuthMiddleware := middleware.PubSubAuthMiddleware(isLocalDev, cfg.DLQEndpointURL, cfg.PubSubPushServiceAccountEmail, logger)
+	subscriptionMiddleware := middleware.SubscriptionLimitMiddleware(subscriptionSvc, lectureSvc)
 
 	// 8. Create ServeMux router
 	mux := http.NewServeMux()
@@ -134,7 +137,7 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	apiV1Mux := http.NewServeMux()
 	userHandler.RegisterRoutes(apiV1Mux, authMiddleware)
 	courseHandler.RegisterRoutes(apiV1Mux, authMiddleware)
-	lectureHandler.RegisterRoutes(apiV1Mux, authMiddleware)
+	lectureHandler.RegisterRoutes(apiV1Mux, authMiddleware, subscriptionMiddleware)
 	dlqHandler.RegisterRoutes(apiV1Mux, pubsubAuthMiddleware)
 
 	// Mount the API v1 routes under /v1
