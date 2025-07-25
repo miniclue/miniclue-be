@@ -179,6 +179,7 @@ CREATE TABLE IF NOT EXISTS slide_images (
   type           TEXT, -- Can be NULL until analysis is complete
   ocr_text       TEXT,
   alt_text       TEXT,
+  metadata       JSONB       NOT NULL DEFAULT '{}'::JSONB,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   -- width, height, and image_index removed for simplicity
@@ -218,7 +219,26 @@ CREATE INDEX IF NOT EXISTS idx_dead_letter_messages_status ON dead_letter_messag
 CREATE INDEX IF NOT EXISTS idx_dead_letter_messages_created_at ON dead_letter_messages(created_at);
 
 -------------------------------------------------------------------------------
--- 12. Row-Level Security (RLS) Policies
+-- 12. LLM Calls Table
+-------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS llm_calls (
+  id                 UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+  lecture_id         UUID           REFERENCES lectures(id) ON DELETE SET NULL,
+  slide_id           UUID           REFERENCES slides(id) ON DELETE SET NULL,
+  call_type          TEXT           NOT NULL CHECK (call_type IN ('ingestion','explanation','embedding','summary','image_analysis','other')),
+  model              TEXT           NOT NULL,
+  prompt_tokens      INT            NOT NULL,
+  completion_tokens  INT            NOT NULL,
+  total_tokens       INT            NOT NULL,
+  currency           TEXT           NOT NULL DEFAULT 'USD',
+  cost               NUMERIC(10,6)  NOT NULL,
+  occurred_at        TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
+  metadata           JSONB          NOT NULL DEFAULT '{}'::JSONB
+);
+CREATE INDEX IF NOT EXISTS idx_llm_calls_occurred_at ON llm_calls(occurred_at);
+
+-------------------------------------------------------------------------------
+-- 13. Row-Level Security (RLS) Policies
 -------------------------------------------------------------------------------
 
 -- Enable RLS for all relevant tables
@@ -233,6 +253,7 @@ ALTER TABLE public.explanations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.slide_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dead_letter_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.llm_calls ENABLE ROW LEVEL SECURITY;
 
 -- 1. courses: Users can manage their own courses fully.
 CREATE POLICY "Allow all access to own courses" ON public.courses
@@ -301,6 +322,12 @@ CREATE POLICY "Allow all access to own notes" ON public.notes
 -- 11. dead_letter_messages: No access for regular users.
 -- These are internal records for backend debugging, accessible only via service_role.
 CREATE POLICY "Deny all access to dead_letter_messages" ON public.dead_letter_messages
+  FOR ALL
+  USING (false)
+  WITH CHECK (false);
+
+-- 12. llm_calls: No access for regular users.
+CREATE POLICY "Deny all access to llm_calls" ON public.llm_calls
   FOR ALL
   USING (false)
   WITH CHECK (false);

@@ -20,13 +20,14 @@ const pythonAPIBaseURLLocal = "http://host.docker.internal:8000"
 const gatewayAPIURLLocal = "http://host.docker.internal:8080/v1/dlq"
 
 func main() {
-	// --- Configuration Setup for Local Environment ---
+	// Load environment variables early for local development
+	if err := godotenv.Load(); err != nil {
+		fmt.Println("No .env file found, relying on system environment variables.")
+	}
+
+	// Configuration Setup for Local Environment
 	logger := logger.New()
 	logger.Info().Msg("Starting Pub/Sub setup for the local environment.")
-
-	if err := godotenv.Load(); err != nil {
-		logger.Warn().Msg("No .env file found, relying on system environment variables.")
-	}
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -59,7 +60,7 @@ func main() {
 		}
 	}()
 
-	// --- Execute Local Reset and Creation ---
+	// Execute Local Reset and Creation
 	resetLocalEmulator(ctx, client, logger)
 	createOrUpdateResources(ctx, client, logger)
 
@@ -111,12 +112,12 @@ func createOrUpdateResources(ctx context.Context, client *pubsub.Client, logger 
 	sevenDays := 7 * 24 * time.Hour
 
 	for _, topicID := range topics {
-		// --- Name Generation for Local Env ---
+		// Name Generation for Local Env
 		dlqTopicID := topicID + "-dlq"
 		subID := fmt.Sprintf("%s-sub", topicID)
 		dlqSubID := fmt.Sprintf("%s-dlq-sub", topicID)
 
-		// --- Endpoint Generation for Local Env ---
+		// Endpoint Generation for Local Env
 		pushEndpoint := fmt.Sprintf("%s/%s", pythonAPIBaseURLLocal, topicID)
 
 		logger.Info().Msgf("\n--- Ensuring resources for topic: %s (Local Env) ---", topicID)
@@ -127,7 +128,7 @@ func createOrUpdateResources(ctx context.Context, client *pubsub.Client, logger 
 		dlqTopic, _ := createTopicIfNotExists(ctx, client, logger, dlqTopicID, sevenDays)
 		mainTopic, _ := createTopicIfNotExists(ctx, client, logger, topicID, sevenDays)
 
-		// --- Subscription Configurations ---
+		// Subscription Configurations
 		mainSubConfig := pubsub.SubscriptionConfig{
 			Topic:            mainTopic,
 			PushConfig:       pubsub.PushConfig{Endpoint: pushEndpoint},
