@@ -91,6 +91,49 @@ Base URL:
 └── GET /recents → list recent lectures (`?limit=&offset=`)
 ```
 
+# Pricing
+
+**Free:**
+
+- Cost: $0/mo
+- 3 lecture uploads per month
+- Max 10 MB per lecture
+- Limited chat usage
+
+**Beta:**
+
+- Cost: $0/mo
+- Unlimited lecture uploads per month (100 lecture uploads per month)
+- Max 300 MB per lecture
+- Unlimited chat usage
+- Beta pricing will only end once beta is over
+
+**Pro (Monthly) (Early Adopter):**
+
+- Cost: $10/mo
+- Unlimited lecture uploads per month
+- Max 300 MB per lecture
+- Unlimited chat usage
+- Price will increase to $20/month as new features (tutorial explainers, flashcards, MCQ quiz) are added
+
+**Pro (Annual) (Early Adopter):**
+
+- Cost: $6/mo ($72/yr)
+- Same benefits as Pro (Monthly)
+- Price will increase to $12/mo ($144/yr) as new features (tutorial explainers, flashcards, MCQ quiz) are added
+
+**Pro (Monthly):**
+
+- Cost: $20/mo
+- Unlimited lecture uploads per month
+- Max 300 MB per lecture
+- Unlimited chat usage
+
+**Pro (Annual):**
+
+- Cost: $12/mo ($144/yr)
+- Same benefits as Pro (Monthly)
+
 # Authentication
 
 1. **Sign-in**

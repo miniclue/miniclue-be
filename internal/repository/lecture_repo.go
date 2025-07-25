@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"app/internal/model"
 
@@ -18,6 +19,7 @@ type LectureRepository interface {
 	DeleteLecture(ctx context.Context, lectureID string) error
 	UpdateLecture(ctx context.Context, l *model.Lecture) error
 	CreateLecture(ctx context.Context, lecture *model.Lecture) (*model.Lecture, error)
+	CountLecturesByUser(ctx context.Context, userID string, start, end time.Time) (int, error)
 }
 
 type lectureRepository struct {
@@ -177,4 +179,20 @@ func (r *lectureRepository) CreateLecture(ctx context.Context, lecture *model.Le
 		return nil, fmt.Errorf("creating lecture: %w", err)
 	}
 	return lecture, nil
+}
+
+func (r *lectureRepository) CountLecturesByUser(ctx context.Context, userID string, start, end time.Time) (int, error) {
+	var count int
+	query := `
+		SELECT COUNT(*)
+		FROM lectures
+		WHERE user_id = $1
+			AND created_at >= $2
+			AND created_at < $3
+	`
+	err := r.pool.QueryRow(ctx, query, userID, start, end).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("counting lectures for user %s: %w", userID, err)
+	}
+	return count, nil
 }

@@ -8,6 +8,7 @@ import (
 
 	"app/internal/api/v1/dto"
 	"app/internal/middleware"
+	"app/internal/model"
 	"app/internal/service"
 
 	"github.com/go-playground/validator/v10"
@@ -53,10 +54,14 @@ func NewLectureHandler(
 	}
 }
 
-// RegisterRoutes mounts lecture routes under /lectures/{id}
-func (h *LectureHandler) RegisterRoutes(mux *http.ServeMux, authMw func(http.Handler) http.Handler) {
-	mux.Handle("/lectures", authMw(http.HandlerFunc(h.handleLectures)))
-	mux.Handle("/lectures/", authMw(http.HandlerFunc(h.handleLecture)))
+// RegisterRoutes mounts lecture routes under /lectures/{id} with auth and subscription limit middlewares
+func (h *LectureHandler) RegisterRoutes(mux *http.ServeMux, authMw func(http.Handler) http.Handler, subMw func(http.Handler) http.Handler) {
+	// Combine auth and subscription middlewares
+	chain := func(next http.Handler) http.Handler {
+		return authMw(subMw(next))
+	}
+	mux.Handle("/lectures", chain(http.HandlerFunc(h.handleLectures)))
+	mux.Handle("/lectures/", chain(http.HandlerFunc(h.handleLecture)))
 }
 
 func (h *LectureHandler) handleLecture(w http.ResponseWriter, r *http.Request) {
@@ -366,8 +371,15 @@ func (h *LectureHandler) uploadLecture(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	// Parse multipart form (10 MB)
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
+	// Parse multipart form using plan-defined max size
+	planVal := r.Context().Value(middleware.PlanContextKey)
+	plan, ok := planVal.(*model.SubscriptionPlan)
+	if !ok || plan == nil {
+		http.Error(w, "Could not determine subscription plan", http.StatusInternalServerError)
+		return
+	}
+	maxBytes := int64(plan.MaxSizeMB) << 20 // MB to bytes
+	if err := r.ParseMultipartForm(maxBytes); err != nil {
 		http.Error(w, "Error parsing multipart form: "+err.Error(), http.StatusBadRequest)
 		return
 	}

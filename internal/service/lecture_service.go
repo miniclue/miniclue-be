@@ -28,6 +28,7 @@ type LectureService interface {
 	UpdateLecture(ctx context.Context, l *model.Lecture) error
 	CreateLectureWithPDF(ctx context.Context, courseID, userID, title string, file multipart.File, header *multipart.FileHeader) (*model.Lecture, error)
 	GetPresignedURL(ctx context.Context, storagePath string) (string, error)
+	CountLecturesByUser(ctx context.Context, userID string, start, end time.Time) (int, error)
 }
 
 // lectureService is the implementation of LectureService
@@ -228,4 +229,9 @@ func (s *lectureService) GetPresignedURL(ctx context.Context, storagePath string
 		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
 	}
 	return resp.URL, nil
+}
+
+// Add CountLecturesByUser implementation
+func (s *lectureService) CountLecturesByUser(ctx context.Context, userID string, start, end time.Time) (int, error) {
+	return s.repo.CountLecturesByUser(ctx, userID, start, end)
 }

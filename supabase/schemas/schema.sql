@@ -238,7 +238,41 @@ CREATE TABLE IF NOT EXISTS llm_calls (
 CREATE INDEX IF NOT EXISTS idx_llm_calls_occurred_at ON llm_calls(occurred_at);
 
 -------------------------------------------------------------------------------
--- 13. Row-Level Security (RLS) Policies
+-- 13. Subscription Status Enum
+-------------------------------------------------------------------------------
+CREATE TYPE subscription_status AS ENUM (
+  'active',
+  'cancelled',
+  'past_due'
+);
+
+-------------------------------------------------------------------------------
+-- 14. Subscription Plans Table
+-------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS subscription_plans (
+  id              TEXT        PRIMARY KEY,
+  name            TEXT        NOT NULL,
+  price_cents     INT         NOT NULL,
+  billing_period  INTERVAL    NOT NULL,
+  max_uploads     INT         NOT NULL,
+  max_size_mb     INT         NOT NULL,
+  chat_limit      INT         NOT NULL DEFAULT -1,
+  feature_flags   JSONB       NOT NULL DEFAULT '{}'::JSONB
+);
+
+-------------------------------------------------------------------------------
+-- 15. User Subscriptions Table
+-------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_subscriptions (
+  user_id    UUID               PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  plan_id    TEXT               NOT NULL REFERENCES subscription_plans(id),
+  starts_at  TIMESTAMPTZ        NOT NULL DEFAULT NOW(),
+  ends_at    TIMESTAMPTZ        NOT NULL,
+  status     subscription_status NOT NULL
+);
+
+-------------------------------------------------------------------------------
+-- 16. Row-Level Security (RLS) Policies
 -------------------------------------------------------------------------------
 
 -- Enable RLS for all relevant tables
@@ -254,6 +288,8 @@ ALTER TABLE public.slide_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dead_letter_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.llm_calls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subscription_plans ENABLE ROW LEVEL SECURITY;
 
 -- 1. courses: Users can manage their own courses fully.
 CREATE POLICY "Allow all access to own courses" ON public.courses
@@ -328,6 +364,16 @@ CREATE POLICY "Deny all access to dead_letter_messages" ON public.dead_letter_me
 
 -- 12. llm_calls: No access for regular users.
 CREATE POLICY "Deny all access to llm_calls" ON public.llm_calls
+  FOR ALL
+  USING (false)
+  WITH CHECK (false);
+
+-- 13. user_subscriptions: Users can view their own subscription.
+CREATE POLICY "Allow users to view own subscription" ON public.user_subscriptions
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- 14. subscription_plans: No access for regular users.
+CREATE POLICY "Deny all access to subscription_plans" ON public.subscription_plans
   FOR ALL
   USING (false)
   WITH CHECK (false);

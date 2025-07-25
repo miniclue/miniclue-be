@@ -23,18 +23,21 @@ type UserService interface {
 }
 
 type userService struct {
-	userRepo    repository.UserRepository
-	courseRepo  repository.CourseRepository
-	lectureRepo repository.LectureRepository
-	userLogger  zerolog.Logger
+	userRepo         repository.UserRepository
+	courseRepo       repository.CourseRepository
+	lectureRepo      repository.LectureRepository
+	subscriptionRepo repository.SubscriptionRepository
+	userLogger       zerolog.Logger
 }
 
-func NewUserService(userRepo repository.UserRepository, courseRepo repository.CourseRepository, lectureRepo repository.LectureRepository, logger zerolog.Logger) UserService {
+func NewUserService(userRepo repository.UserRepository, courseRepo repository.CourseRepository, lectureRepo repository.LectureRepository, subscriptionRepo repository.SubscriptionRepository, logger zerolog.Logger) UserService {
+	// subscriptionRepo used to onboard new users to beta plan
 	return &userService{
-		userRepo:    userRepo,
-		courseRepo:  courseRepo,
-		lectureRepo: lectureRepo,
-		userLogger:  logger.With().Str("service", "UserService").Logger(),
+		userRepo:         userRepo,
+		courseRepo:       courseRepo,
+		lectureRepo:      lectureRepo,
+		subscriptionRepo: subscriptionRepo,
+		userLogger:       logger.With().Str("service", "UserService").Logger(),
 	}
 }
 
@@ -42,6 +45,11 @@ func (s *userService) Create(ctx context.Context, u *model.User) (*model.User, e
 	err := s.userRepo.CreateUser(ctx, u)
 	if err != nil {
 		s.userLogger.Error().Err(err).Str("user_id", u.UserID).Msg("Failed to create user")
+		return nil, err
+	}
+	// Onboard new user to default subscription (currently 'beta')
+	if err := s.subscriptionRepo.UpsertSubscription(ctx, u.UserID, "beta"); err != nil {
+		s.userLogger.Error().Err(err).Str("user_id", u.UserID).Msg("Failed to assign subscription")
 		return nil, err
 	}
 	return u, nil
