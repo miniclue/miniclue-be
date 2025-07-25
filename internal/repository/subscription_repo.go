@@ -33,9 +33,8 @@ func (r *subscriptionRepo) GetActiveSubscription(ctx context.Context, userID str
         SELECT user_id, plan_id, starts_at, ends_at, status
         FROM user_subscriptions
         WHERE user_id = $1
-          AND status = 'active'
-          AND starts_at <= NOW()
-          AND ends_at > NOW()
+          AND status IN ('active', 'cancelled') -- Allow paid users to use service until period end
+          AND (ends_at + INTERVAL '6 hours') > NOW() -- 6h grace period covers the gap before the daily cron job renews free/beta plans
     `
 	var us model.UserSubscription
 	err := r.pool.QueryRow(ctx, q, userID).Scan(

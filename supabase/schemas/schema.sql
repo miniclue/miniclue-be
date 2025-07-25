@@ -1,5 +1,9 @@
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS vector;    -- pgvector
+CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog;
+
+GRANT USAGE ON SCHEMA cron TO postgres;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA cron TO postgres;
 
 SET search_path TO public;
 
@@ -377,3 +381,25 @@ CREATE POLICY "Deny all access to subscription_plans" ON public.subscription_pla
   FOR ALL
   USING (false)
   WITH CHECK (false);
+
+-------------------------------------------------------------------------------
+-- 17. Scheduled Subscription Renewal Job
+-------------------------------------------------------------------------------
+-- This block schedules a cron job to renew beta and free plans.
+-- It will run once daily at 3:00 AM UTC.
+-- NOTE: The pg_cron extension must be enabled in your Supabase project.
+-- This operation is idempotent; it safely does nothing if the job already exists.
+SELECT cron.schedule(
+  'renew-free-expiring-subscriptions', -- Job name
+  '0 3 * * *',                   -- 3:00 AM UTC every day
+  $$
+    UPDATE user_subscriptions
+    SET 
+      starts_at = ends_at,
+      ends_at = ends_at + interval '31 days'
+    WHERE
+      status = 'active'
+      AND plan_id IN ('beta', 'free') -- Only renew non-paid plans
+      AND ends_at <= NOW();
+  $$
+);
