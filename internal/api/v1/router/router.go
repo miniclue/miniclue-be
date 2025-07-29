@@ -129,7 +129,7 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)
 	isLocalDev := cfg.PubSubEmulatorHost != ""
 	pubsubAuthMiddleware := middleware.PubSubAuthMiddleware(isLocalDev, cfg.DLQEndpointURL, cfg.PubSubPushServiceAccountEmail, logger)
-	subscriptionMiddleware := middleware.SubscriptionLimitMiddleware(subscriptionSvc, lectureSvc)
+	subscriptionMiddleware := middleware.SubscriptionLimitMiddleware(subscriptionSvc)
 
 	// 8. Create ServeMux router
 	mux := http.NewServeMux()

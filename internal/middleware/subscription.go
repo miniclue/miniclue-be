@@ -10,27 +10,30 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// subscriptionContextKey is key type for storing values in context
+// contextKey type for subscription middleware
 type subscriptionContextKey string
 
-// PlanContextKey stores the user's SubscriptionPlan in the request context
+// PlanContextKey stores the SubscriptionPlan in context
 const PlanContextKey subscriptionContextKey = "subscriptionPlan"
 
-// SubscriptionLimitMiddleware checks upload limits for lecture uploads.
-func SubscriptionLimitMiddleware(subSvc service.SubscriptionService, lecSvc service.LectureService) func(http.Handler) http.Handler {
+// SubscriptionContextKey stores the UserSubscription in context
+const SubscriptionContextKey subscriptionContextKey = "userSubscription"
+
+// SubscriptionLimitMiddleware fetches and injects subscription data for lecture uploads.
+func SubscriptionLimitMiddleware(subSvc service.SubscriptionService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Only enforce on POST /lectures
+			// Only prepare plan context for POST /lectures
 			if r.Method == http.MethodPost && r.URL.Path == "/lectures" {
-				// Get user ID from context
 				userID, ok := r.Context().Value(UserContextKey).(string)
 				if !ok || userID == "" {
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
 				}
-				// Fetch subscription
+				// Fetch subscription, block if none
 				sub, err := subSvc.GetActiveSubscription(r.Context(), userID)
 				if err != nil {
+					// No active sub => forbidden
 					if errors.Is(err, pgx.ErrNoRows) {
 						http.Error(w, "No active subscription found", http.StatusForbidden)
 						return
@@ -44,22 +47,10 @@ func SubscriptionLimitMiddleware(subSvc service.SubscriptionService, lecSvc serv
 					http.Error(w, "Failed to fetch plan: "+err.Error(), http.StatusInternalServerError)
 					return
 				}
-				// Inject plan into context for downstream handlers
+				// Inject subscription and plan into context for downstream handlers
 				ctx := context.WithValue(r.Context(), PlanContextKey, plan)
+				ctx = context.WithValue(ctx, SubscriptionContextKey, sub)
 				r = r.WithContext(ctx)
-				// Enforce upload limit only if finite (>0)
-				if plan.MaxUploads > 0 {
-					// Count lectures in current period
-					count, err := lecSvc.CountLecturesByUser(r.Context(), userID, sub.StartsAt, sub.EndsAt)
-					if err != nil {
-						http.Error(w, "Failed to count uploads: "+err.Error(), http.StatusInternalServerError)
-						return
-					}
-					if count >= plan.MaxUploads {
-						http.Error(w, "Upload limit reached", http.StatusTooManyRequests)
-						return
-					}
-				}
 			}
 			next.ServeHTTP(w, r)
 		})
