@@ -8,27 +8,6 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA cron TO postgres;
 SET search_path TO public;
 
 -------------------------------------------------------------------------------
--- ENUM Types
--------------------------------------------------------------------------------
--- Expanded status to track the full pipeline lifecycle
-CREATE TYPE lecture_status AS ENUM (
-  'uploading',
-  'pending_processing',
-  'parsing',
-  'explaining',
-  'summarising',
-  'complete',
-  'failed'
-);
-
--- Status for dead-letter queue messages
-CREATE TYPE dlq_message_status AS ENUM (
-  'unprocessed',
-  'processed',
-  'ignored'
-);
-
--------------------------------------------------------------------------------
 -- 1. Course Table
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS courses (
@@ -58,6 +37,16 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 -------------------------------------------------------------------------------
 -- 3. Lecture Table
 -------------------------------------------------------------------------------
+CREATE TYPE lecture_status AS ENUM (
+  'uploading',
+  'pending_processing',
+  'parsing',
+  'explaining',
+  'summarising',
+  'complete',
+  'failed'
+);
+
 CREATE TABLE IF NOT EXISTS lectures (
   id                        UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id                   UUID            NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -209,6 +198,12 @@ CREATE INDEX IF NOT EXISTS idx_notes_lecture_id ON notes(lecture_id);
 -------------------------------------------------------------------------------
 -- 11. Dead-Letter Queue Table
 -------------------------------------------------------------------------------
+CREATE TYPE dlq_message_status AS ENUM (
+  'unprocessed',
+  'processed',
+  'ignored'
+);
+
 CREATE TABLE IF NOT EXISTS dead_letter_messages (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   subscription_name   TEXT NOT NULL,
@@ -276,7 +271,23 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
 );
 
 -------------------------------------------------------------------------------
--- 16. Row-Level Security (RLS) Policies
+-- 16. Usage Events Table
+-------------------------------------------------------------------------------
+CREATE TYPE usage_event_type AS ENUM (
+  'lecture_upload'
+);
+
+CREATE TABLE IF NOT EXISTS usage_events (
+  id           UUID              PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      UUID              NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  event_type   usage_event_type  NOT NULL,
+  created_at   TIMESTAMPTZ       NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_usage_events_user_event_time 
+  ON usage_events(user_id, event_type, created_at);
+
+-------------------------------------------------------------------------------
+-- 17. Row-Level Security (RLS) Policies
 -------------------------------------------------------------------------------
 
 -- Enable RLS for all relevant tables
@@ -294,6 +305,7 @@ ALTER TABLE public.dead_letter_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.llm_calls ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subscription_plans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.usage_events ENABLE ROW LEVEL SECURITY;
 
 -- 1. courses: Users can manage their own courses fully.
 CREATE POLICY "Allow all access to own courses" ON public.courses
@@ -381,6 +393,10 @@ CREATE POLICY "Deny all access to subscription_plans" ON public.subscription_pla
   FOR ALL
   USING (false)
   WITH CHECK (false);
+
+-- 15. Usage Events Table
+CREATE POLICY "Deny all access to usage_events" ON public.usage_events
+  FOR ALL USING (false) WITH CHECK (false);
 
 -------------------------------------------------------------------------------
 -- 17. Scheduled Subscription Renewal Job

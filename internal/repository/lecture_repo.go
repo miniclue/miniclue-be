@@ -182,11 +182,13 @@ func (r *lectureRepository) CreateLecture(ctx context.Context, lecture *model.Le
 }
 
 func (r *lectureRepository) CountLecturesByUser(ctx context.Context, userID string, start, end time.Time) (int, error) {
+	// Count actual lecture upload events rather than stored lectures
 	var count int
 	query := `
 		SELECT COUNT(*)
-		FROM lectures
+		FROM usage_events
 		WHERE user_id = $1
+			AND event_type = 'lecture_upload'
 			AND created_at >= $2
 			AND created_at < $3
 	`

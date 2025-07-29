@@ -35,6 +35,7 @@ type LectureService interface {
 type lectureService struct {
 	repo           repository.LectureRepository
 	userRepo       repository.UserRepository
+	usageRepo      repository.UsageRepository
 	s3Client       *s3.Client
 	bucketName     string
 	publisher      pubsub.Publisher
@@ -43,10 +44,20 @@ type lectureService struct {
 }
 
 // NewLectureService creates a new LectureService
-func NewLectureService(repo repository.LectureRepository, userRepo repository.UserRepository, s3Client *s3.Client, bucketName string, publisher pubsub.Publisher, ingestionTopic string, logger zerolog.Logger) LectureService {
+func NewLectureService(
+	repo repository.LectureRepository,
+	userRepo repository.UserRepository,
+	usageRepo repository.UsageRepository,
+	s3Client *s3.Client,
+	bucketName string,
+	publisher pubsub.Publisher,
+	ingestionTopic string,
+	logger zerolog.Logger,
+) LectureService {
 	return &lectureService{
 		repo:           repo,
 		userRepo:       userRepo,
+		usageRepo:      usageRepo,
 		s3Client:       s3Client,
 		bucketName:     bucketName,
 		publisher:      publisher,
@@ -212,6 +223,11 @@ func (s *lectureService) CreateLectureWithPDF(ctx context.Context, courseID, use
 			s.lectureLogger.Error().Err(err).Str("topic", s.ingestionTopic).Msg("Failed to publish ingestion job")
 			// Don't return an error here either.
 		}
+	}
+
+	// Record upload event for usage tracking
+	if err := s.usageRepo.RecordUploadEvent(ctx, userID); err != nil {
+		s.lectureLogger.Error().Err(err).Msg("Failed to record upload event")
 	}
 
 	return createdLecture, nil

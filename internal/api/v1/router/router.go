@@ -103,6 +103,7 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	// 6. Initialize repositories & services & handlers
 	userRepo := repository.NewUserRepo(pool)
 	lectureRepo := repository.NewLectureRepository(pool)
+	usageRepo := repository.NewUsageRepo(pool) // new usage events repo
 	courseRepo := repository.NewCourseRepo(pool)
 	summaryRepo := repository.NewSummaryRepository(pool)
 	explanationRepo := repository.NewExplanationRepository(pool)
@@ -111,7 +112,7 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	subscriptionRepo := repository.NewSubscriptionRepo(pool)
 
 	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo, subscriptionRepo, logger)
-	lectureSvc := service.NewLectureService(lectureRepo, userRepo, s3Client, cfg.S3Bucket, pubSubPublisher, cfg.PubSubIngestionTopic, logger)
+	lectureSvc := service.NewLectureService(lectureRepo, userRepo, usageRepo, s3Client, cfg.S3Bucket, pubSubPublisher, cfg.PubSubIngestionTopic, logger)
 	courseSvc := service.NewCourseService(courseRepo, lectureSvc, logger)
 	summarySvc := service.NewSummaryService(summaryRepo, logger)
 	explanationSvc := service.NewExplanationService(explanationRepo, logger)
