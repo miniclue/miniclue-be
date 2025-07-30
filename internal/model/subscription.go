@@ -16,9 +16,10 @@ type SubscriptionPlan struct {
 
 // UserSubscription represents an individual user's subscription record.
 type UserSubscription struct {
-	UserID   string    `db:"user_id"`
-	PlanID   string    `db:"plan_id"`
-	StartsAt time.Time `db:"starts_at"`
-	EndsAt   time.Time `db:"ends_at"`
-	Status   string    `db:"status"`
+	UserID               string    `db:"user_id"`
+	PlanID               string    `db:"plan_id"`
+	StripeSubscriptionID string    `db:"stripe_subscription_id" json:"stripe_subscription_id,omitempty"`
+	StartsAt             time.Time `db:"starts_at"`
+	EndsAt               time.Time `db:"ends_at"`
+	Status               string    `db:"status"`
 }

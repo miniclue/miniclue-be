@@ -118,12 +118,15 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	explanationSvc := service.NewExplanationService(explanationRepo, logger)
 	noteSvc := service.NewNoteService(noteRepo, logger)
 	dlqSvc := service.NewDLQService(dlqRepo, logger)
-	subscriptionSvc := service.NewSubscriptionService(subscriptionRepo)
+	subscriptionSvc := service.NewSubscriptionService(subscriptionRepo, logger)
+	stripeSvc := service.NewStripeService(cfg, userRepo, subscriptionSvc, logger)
 
 	userHandler := handler.NewUserHandler(userSvc, validate, logger)
 	courseHandler := handler.NewCourseHandler(courseSvc, validate, logger)
 	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, summarySvc, explanationSvc, noteSvc, validate, cfg.S3URL, cfg.S3Bucket, logger)
 	dlqHandler := handler.NewDLQHandler(dlqSvc, logger)
+	subscriptionHandler := handler.NewSubscriptionHandler(stripeSvc, subscriptionSvc, logger)
+	stripeHandler := handler.NewStripeHandler(stripeSvc)
 
 	// 7. Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)
@@ -140,6 +143,8 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	courseHandler.RegisterRoutes(apiV1Mux, authMiddleware)
 	lectureHandler.RegisterRoutes(apiV1Mux, authMiddleware, subscriptionMiddleware)
 	dlqHandler.RegisterRoutes(apiV1Mux, pubsubAuthMiddleware)
+	subscriptionHandler.RegisterRoutes(apiV1Mux, authMiddleware)
+	stripeHandler.RegisterRoutes(apiV1Mux)
 
 	// Mount the API v1 routes under /v1
 	mux.Handle("/v1/", http.StripPrefix("/v1", apiV1Mux))

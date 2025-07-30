@@ -108,7 +108,7 @@ Base URL:
 - Unlimited chat usage
 - Beta pricing will only end once beta is over
 
-**Pro (Monthly) (Early Adopter):**
+**Pro (Monthly) - Launch Offer:**
 
 - Cost: $10/mo
 - Unlimited lecture uploads per month
@@ -116,7 +116,7 @@ Base URL:
 - Unlimited chat usage
 - Price will increase to $20/month as new features (tutorial explainers, flashcards, MCQ quiz) are added
 
-**Pro (Annual) (Early Adopter):**
+**Pro (Annual) - Launch Offer:**
 
 - Cost: $6/mo ($72/yr)
 - Same benefits as Pro (Monthly)
@@ -177,7 +177,7 @@ Stripe is the source of truth for all paid plans. Our database simply mirrors th
 5.  **Failed Payments (Dunning):**
     - If a recurring payment fails, Stripe sends an `invoice.payment_failed` webhook.
     - Our handler updates the user's subscription `status` to `'past_due'`.
-    - Our API middleware will block access for any user whose status is not `'active'` or `'cancelled'`.
+    - Our API middleware will block lecture upload for any user whose status is not `'active'` or `'cancelled'`.
 
 # Authentication
 

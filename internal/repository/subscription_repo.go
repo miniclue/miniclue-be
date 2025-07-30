@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"app/internal/model"
 
@@ -16,6 +17,7 @@ type SubscriptionRepository interface {
 	GetPlanByID(ctx context.Context, planID string) (*model.SubscriptionPlan, error)
 	// UpsertSubscription creates a subscription with the given planId for a new user if none exists, using the plan's billing_period.
 	UpsertSubscription(ctx context.Context, userID, planID string) error
+	UpsertStripeSubscription(ctx context.Context, userID, planID string, startsAt, endsAt time.Time, status, stripeSubscriptionID string) error
 }
 
 type subscriptionRepo struct {
@@ -97,6 +99,23 @@ func (r *subscriptionRepo) UpsertSubscription(ctx context.Context, userID, planI
 	_, err := r.pool.Exec(ctx, q, userID, planID)
 	if err != nil {
 		return fmt.Errorf("upserting subscription %s for user %s: %w", planID, userID, err)
+	}
+	return nil
+}
+
+func (r *subscriptionRepo) UpsertStripeSubscription(ctx context.Context, userID, planID string, startsAt, endsAt time.Time, status, stripeSubscriptionID string) error {
+	const q = `
+        INSERT INTO user_subscriptions (user_id, plan_id, stripe_subscription_id, starts_at, ends_at, status)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (user_id) DO UPDATE
+        SET plan_id = EXCLUDED.plan_id,
+            stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+            starts_at = EXCLUDED.starts_at,
+            ends_at = EXCLUDED.ends_at,
+            status = EXCLUDED.status;
+    `
+	if _, err := r.pool.Exec(ctx, q, userID, planID, stripeSubscriptionID, startsAt, endsAt, status); err != nil {
+		return fmt.Errorf("upsert stripe subscription for user %s: %w", userID, err)
 	}
 	return nil
 }

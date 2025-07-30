@@ -145,10 +145,10 @@ using ((auth.uid() = user_id));
 INSERT INTO public.subscription_plans (id, name, price_cents, billing_period, max_uploads, max_size_mb, chat_limit, feature_flags) VALUES
   ('free', 'Free', 0, '31 days', 3, 10, -1, '{}'::jsonb),
   ('beta', 'Beta', 0, '31 days', 100, 300, -1, '{}'::jsonb),
-  ('pro_monthly_early', 'Pro (Monthly) Early Adopter', 1000, '31 days', -1, 300, -1, '{}'::jsonb),
-  ('pro_annual_early', 'Pro (Annual) Early Adopter', 600, '365 days', -1, 300, -1, '{}'::jsonb),
-  ('pro_monthly', 'Pro (Monthly)', 2000, '31 days', -1, 300, -1, '{}'::jsonb),
-  ('pro_annual', 'Pro (Annual)', 1200, '365 days', -1, 300, -1, '{}'::jsonb)
+  ('price_1Rq9KPKWAHn295Hnhwqfu6eD', 'Pro (Monthly) - Launch Price', 1000, '31 days', -1, 300, -1, '{}'::jsonb),
+  ('price_1Rq9KPKWAHn295Hneof2Rrtf', 'Pro (Annual) - Launch Price', 600, '365 days', -1, 300, -1, '{}'::jsonb),
+  ('price_1Rq9KPKWAHn295Hn5eHiaQzM', 'Pro (Monthly)', 2000, '31 days', -1, 300, -1, '{}'::jsonb),
+  ('price_1Rq9KPKWAHn295HnlAEWpnyb', 'Pro (Annual)', 1200, '365 days', -1, 300, -1, '{}'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 
 -- Assign Beta plan to all existing users for a 31-day period

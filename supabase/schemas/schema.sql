@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   name       TEXT        DEFAULT '',
   email      TEXT        DEFAULT '',
   avatar_url TEXT        DEFAULT '',
+  stripe_customer_id TEXT DEFAULT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -265,6 +266,7 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
 CREATE TABLE IF NOT EXISTS user_subscriptions (
   user_id    UUID               PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   plan_id    TEXT               NOT NULL REFERENCES subscription_plans(id),
+  stripe_subscription_id TEXT    DEFAULT NULL,
   starts_at  TIMESTAMPTZ        NOT NULL DEFAULT NOW(),
   ends_at    TIMESTAMPTZ        NOT NULL,
   status     subscription_status NOT NULL
