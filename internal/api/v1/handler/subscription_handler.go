@@ -63,7 +63,11 @@ func (h *SubscriptionHandler) Checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"url": url})
+	if err := json.NewEncoder(w).Encode(map[string]string{"url": url}); err != nil {
+		h.logger.Error().Err(err).Msg("failed to encode response")
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
 }
 
 // Portal godoc
@@ -88,7 +92,11 @@ func (h *SubscriptionHandler) Portal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"url": url})
+	if err := json.NewEncoder(w).Encode(map[string]string{"url": url}); err != nil {
+		h.logger.Error().Err(err).Msg("failed to encode response")
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
 }
 
 // Get godoc
@@ -137,5 +145,9 @@ func (h *SubscriptionHandler) Get(w http.ResponseWriter, r *http.Request) {
 		Status:               sub.Status,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("failed to encode response")
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
 }
