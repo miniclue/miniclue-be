@@ -269,7 +269,9 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
   stripe_subscription_id TEXT    DEFAULT NULL,
   starts_at  TIMESTAMPTZ        NOT NULL DEFAULT NOW(),
   ends_at    TIMESTAMPTZ        NOT NULL,
-  status     subscription_status NOT NULL
+  status     subscription_status NOT NULL,
+  created_at TIMESTAMPTZ        NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ        NOT NULL DEFAULT NOW()
 );
 
 -------------------------------------------------------------------------------

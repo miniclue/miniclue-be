@@ -8,7 +8,7 @@ type User struct {
 	Name             string    `db:"name" json:"name"`
 	Email            string    `db:"email" json:"email"`
 	AvatarURL        string    `db:"avatar_url" json:"avatar_url"`
-	StripeCustomerID string    `db:"stripe_customer_id" json:"stripe_customer_id,omitempty"`
+	StripeCustomerID *string   `db:"stripe_customer_id" json:"stripe_customer_id,omitempty"`
 	CreatedAt        time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt        time.Time `db:"updated_at" json:"updated_at"`
 }

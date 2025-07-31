@@ -27,26 +27,41 @@ type userService struct {
 	courseRepo       repository.CourseRepository
 	lectureRepo      repository.LectureRepository
 	subscriptionRepo repository.SubscriptionRepository
+	stripeSvc        *StripeService
 	userLogger       zerolog.Logger
 }
 
-func NewUserService(userRepo repository.UserRepository, courseRepo repository.CourseRepository, lectureRepo repository.LectureRepository, subscriptionRepo repository.SubscriptionRepository, logger zerolog.Logger) UserService {
+func NewUserService(userRepo repository.UserRepository, courseRepo repository.CourseRepository, lectureRepo repository.LectureRepository, subscriptionRepo repository.SubscriptionRepository, stripeSvc *StripeService, logger zerolog.Logger) UserService {
 	// subscriptionRepo used to onboard new users to beta plan
 	return &userService{
 		userRepo:         userRepo,
 		courseRepo:       courseRepo,
 		lectureRepo:      lectureRepo,
 		subscriptionRepo: subscriptionRepo,
+		stripeSvc:        stripeSvc,
 		userLogger:       logger.With().Str("service", "UserService").Logger(),
 	}
 }
 
 func (s *userService) Create(ctx context.Context, u *model.User) (*model.User, error) {
+	// Create user in database first
 	err := s.userRepo.CreateUser(ctx, u)
 	if err != nil {
 		s.userLogger.Error().Err(err).Str("user_id", u.UserID).Msg("Failed to create user")
 		return nil, err
 	}
+
+	// Create Stripe customer (non-blocking - if it fails, user can still use the app)
+	if s.stripeSvc != nil {
+		customerID, err := s.stripeSvc.CreateCustomer(ctx, u)
+		if err != nil {
+			s.userLogger.Warn().Err(err).Str("user_id", u.UserID).Msg("Failed to create Stripe customer during signup - user can still use the app")
+			// Don't return error - user can still use the app without Stripe customer
+		} else {
+			s.userLogger.Info().Str("user_id", u.UserID).Str("stripe_customer_id", customerID).Msg("Created Stripe customer during signup")
+		}
+	}
+
 	// Onboard new user to default subscription (currently 'beta')
 	if err := s.subscriptionRepo.UpsertSubscription(ctx, u.UserID, "beta"); err != nil {
 		s.userLogger.Error().Err(err).Str("user_id", u.UserID).Msg("Failed to assign subscription")

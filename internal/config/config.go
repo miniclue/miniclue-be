@@ -48,6 +48,7 @@ type Config struct {
 	StripePriceAnnual        string `envconfig:"STRIPE_PRICE_ANNUAL" required:"true"`
 	StripePriceMonthlyLaunch string `envconfig:"STRIPE_PRICE_MONTHLY_LAUNCH" required:"true"`
 	StripePriceAnnualLaunch  string `envconfig:"STRIPE_PRICE_ANNUAL_LAUNCH" required:"true"`
+	StripePriceFree          string `envconfig:"STRIPE_PRICE_FREE" default:"free"`
 	StripePortalReturnURL    string `envconfig:"STRIPE_PORTAL_RETURN_URL" required:"true"`
 }
 

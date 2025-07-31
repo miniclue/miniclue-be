@@ -37,8 +37,8 @@ func (r *userRepo) CreateUser(ctx context.Context, u *model.User) error {
 
 func (r *userRepo) GetUserByID(ctx context.Context, id string) (*model.User, error) {
 	var u model.User
-	query := `SELECT user_id, email, name, avatar_url, created_at, updated_at FROM user_profiles WHERE user_id=$1`
-	err := r.pool.QueryRow(ctx, query, id).Scan(&u.UserID, &u.Email, &u.Name, &u.AvatarURL, &u.CreatedAt, &u.UpdatedAt)
+	query := `SELECT user_id, email, name, avatar_url, stripe_customer_id, created_at, updated_at FROM user_profiles WHERE user_id=$1`
+	err := r.pool.QueryRow(ctx, query, id).Scan(&u.UserID, &u.Email, &u.Name, &u.AvatarURL, &u.StripeCustomerID, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil

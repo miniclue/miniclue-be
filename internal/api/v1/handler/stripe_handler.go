@@ -21,7 +21,17 @@ func (h *StripeHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/stripe/webhooks", h.HandleWebhook)
 }
 
-// HandleWebhook processes incoming Stripe webhooks.
+// HandleWebhook godoc
+// @Summary Process Stripe webhook events
+// @Description Receives and processes Stripe webhook events for subscription management.
+// @Tags stripe
+// @Accept json
+// @Produce json
+// @Param request body string true "Stripe webhook payload"
+// @Success 200 {string} string "Webhook processed successfully"
+// @Failure 400 {string} string "Invalid webhook signature or payload"
+// @Failure 500 {string} string "Failed to process webhook"
+// @Router /stripe/webhooks [post]
 func (h *StripeHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	h.stripeSvc.HandleWebhook(w, r)
 }

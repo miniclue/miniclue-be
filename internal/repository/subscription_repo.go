@@ -18,6 +18,7 @@ type SubscriptionRepository interface {
 	// UpsertSubscription creates a subscription with the given planId for a new user if none exists, using the plan's billing_period.
 	UpsertSubscription(ctx context.Context, userID, planID string) error
 	UpsertStripeSubscription(ctx context.Context, userID, planID string, startsAt, endsAt time.Time, status, stripeSubscriptionID string) error
+	DowngradeUserToFreePlan(ctx context.Context, userID, freePlanID string) error
 }
 
 type subscriptionRepo struct {
@@ -32,7 +33,7 @@ func NewSubscriptionRepo(pool *pgxpool.Pool) SubscriptionRepository {
 // GetActiveSubscription returns the current active subscription for a user.
 func (r *subscriptionRepo) GetActiveSubscription(ctx context.Context, userID string) (*model.UserSubscription, error) {
 	const q = `
-        SELECT user_id, plan_id, starts_at, ends_at, status
+        SELECT user_id, plan_id, stripe_subscription_id, starts_at, ends_at, status, created_at, updated_at
         FROM user_subscriptions
         WHERE user_id = $1
           AND status IN ('active', 'cancelled') -- Allow paid users to use service until period end
@@ -42,9 +43,12 @@ func (r *subscriptionRepo) GetActiveSubscription(ctx context.Context, userID str
 	err := r.pool.QueryRow(ctx, q, userID).Scan(
 		&us.UserID,
 		&us.PlanID,
+		&us.StripeSubscriptionID,
 		&us.StartsAt,
 		&us.EndsAt,
 		&us.Status,
+		&us.CreatedAt,
+		&us.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("fetch active subscription for user %s: %w", userID, err)
@@ -90,8 +94,8 @@ func (r *subscriptionRepo) GetPlanByID(ctx context.Context, planID string) (*mod
 // UpsertSubscription creates a subscription for a user with the given planID if none exists.
 func (r *subscriptionRepo) UpsertSubscription(ctx context.Context, userID, planID string) error {
 	const q = `
-        INSERT INTO user_subscriptions (user_id, plan_id, starts_at, ends_at, status)
-        SELECT $1, $2, NOW(), NOW() + billing_period, 'active'
+        INSERT INTO user_subscriptions (user_id, plan_id, starts_at, ends_at, status, created_at, updated_at)
+        SELECT $1, $2, NOW(), NOW() + billing_period, 'active', NOW(), NOW()
         FROM subscription_plans
         WHERE id = $2
         ON CONFLICT (user_id) DO NOTHING;
@@ -104,18 +108,63 @@ func (r *subscriptionRepo) UpsertSubscription(ctx context.Context, userID, planI
 }
 
 func (r *subscriptionRepo) UpsertStripeSubscription(ctx context.Context, userID, planID string, startsAt, endsAt time.Time, status, stripeSubscriptionID string) error {
-	const q = `
-        INSERT INTO user_subscriptions (user_id, plan_id, stripe_subscription_id, starts_at, ends_at, status)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (user_id) DO UPDATE
-        SET plan_id = EXCLUDED.plan_id,
-            stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-            starts_at = EXCLUDED.starts_at,
-            ends_at = EXCLUDED.ends_at,
-            status = EXCLUDED.status;
-    `
-	if _, err := r.pool.Exec(ctx, q, userID, planID, stripeSubscriptionID, startsAt, endsAt, status); err != nil {
+	var q string
+	var args []interface{}
+
+	if stripeSubscriptionID == "" {
+		// Handle empty subscription ID by setting it to NULL
+		q = `
+			INSERT INTO user_subscriptions (user_id, plan_id, stripe_subscription_id, starts_at, ends_at, status, created_at, updated_at)
+			VALUES ($1, $2, NULL, $3, $4, $5, NOW(), NOW())
+			ON CONFLICT (user_id) DO UPDATE
+			SET plan_id = EXCLUDED.plan_id,
+				stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+				starts_at = EXCLUDED.starts_at,
+				ends_at = EXCLUDED.ends_at,
+				status = EXCLUDED.status,
+				updated_at = NOW();
+		`
+		args = []interface{}{userID, planID, startsAt, endsAt, status}
+	} else {
+		// Handle non-empty subscription ID
+		q = `
+			INSERT INTO user_subscriptions (user_id, plan_id, stripe_subscription_id, starts_at, ends_at, status, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+			ON CONFLICT (user_id) DO UPDATE
+			SET plan_id = EXCLUDED.plan_id,
+				stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+				starts_at = EXCLUDED.starts_at,
+				ends_at = EXCLUDED.ends_at,
+				status = EXCLUDED.status,
+				updated_at = NOW();
+		`
+		args = []interface{}{userID, planID, stripeSubscriptionID, startsAt, endsAt, status}
+	}
+
+	_, err := r.pool.Exec(ctx, q, args...)
+	if err != nil {
 		return fmt.Errorf("upsert stripe subscription for user %s: %w", userID, err)
+	}
+	return nil
+}
+
+// DowngradeUserToFreePlan downgrades a user to the free plan when their subscription is deleted
+func (r *subscriptionRepo) DowngradeUserToFreePlan(ctx context.Context, userID, freePlanID string) error {
+	const q = `
+		UPDATE user_subscriptions
+		SET
+			plan_id = $2,
+			status = 'active',
+			starts_at = NOW(),
+			ends_at = NOW() + INTERVAL '31 days',
+			stripe_subscription_id = NULL,
+			updated_at = NOW()
+		WHERE
+			user_id = $1;
+	`
+	_, err := r.pool.Exec(ctx, q, userID, freePlanID)
+	if err != nil {
+		return fmt.Errorf("downgrade user %s to free plan: %w", userID, err)
 	}
 	return nil
 }
