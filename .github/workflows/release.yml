@@ -72,6 +72,14 @@ jobs:
             GCP_PROJECT_ID_PROD=${{ secrets.GCP_PROJECT_ID }}
             DLQ_ENDPOINT_URL=${{ secrets.DLQ_ENDPOINT_URL }}
             PUBSUB_PUSH_SERVICE_ACCOUNT_EMAIL=${{ secrets.PUBSUB_PUSH_SERVICE_ACCOUNT_EMAIL }}
+            STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+            STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
+            STRIPE_PRICE_MONTHLY=${{ secrets.STRIPE_PRICE_MONTHLY }}
+            STRIPE_PRICE_ANNUAL=${{ secrets.STRIPE_PRICE_ANNUAL }}
+            STRIPE_PRICE_MONTHLY_LAUNCH=${{ secrets.STRIPE_PRICE_MONTHLY_LAUNCH }}
+            STRIPE_PRICE_ANNUAL_LAUNCH=${{ secrets.STRIPE_PRICE_ANNUAL_LAUNCH }}
+            STRIPE_PRICE_FREE=free
+            STRIPE_PORTAL_RETURN_URL=${{ secrets.STRIPE_PORTAL_RETURN_URL }}
 
       - name: Show Cloud Run URL
         run: echo "Deployed to ${{ steps.deploy.outputs.url }}"
