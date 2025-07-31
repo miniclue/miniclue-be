@@ -16,6 +16,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/rs/cors v1.11.1
 	github.com/rs/zerolog v1.34.0
+	github.com/stripe/stripe-go/v82 v82.3.0
 	github.com/swaggo/swag v1.16.4
 	google.golang.org/api v0.241.0
 )

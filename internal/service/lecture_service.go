@@ -19,6 +19,9 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// ErrUploadLimitExceeded is returned when a user has reached their upload limit.
+var ErrUploadLimitExceeded = repository.ErrUploadLimitExceeded
+
 // LectureService defines lecture-related operations
 // GetLecturesByCourseID retrieves lectures for a given course with pagination
 type LectureService interface {
@@ -29,12 +32,15 @@ type LectureService interface {
 	CreateLectureWithPDF(ctx context.Context, courseID, userID, title string, file multipart.File, header *multipart.FileHeader) (*model.Lecture, error)
 	GetPresignedURL(ctx context.Context, storagePath string) (string, error)
 	CountLecturesByUser(ctx context.Context, userID string, start, end time.Time) (int, error)
+	// CheckAndRecordUpload atomically enforces and records an upload event.
+	CheckAndRecordUpload(ctx context.Context, userID string, start, end time.Time, maxUploads int) error
 }
 
 // lectureService is the implementation of LectureService
 type lectureService struct {
 	repo           repository.LectureRepository
 	userRepo       repository.UserRepository
+	usageRepo      repository.UsageRepository
 	s3Client       *s3.Client
 	bucketName     string
 	publisher      pubsub.Publisher
@@ -43,10 +49,20 @@ type lectureService struct {
 }
 
 // NewLectureService creates a new LectureService
-func NewLectureService(repo repository.LectureRepository, userRepo repository.UserRepository, s3Client *s3.Client, bucketName string, publisher pubsub.Publisher, ingestionTopic string, logger zerolog.Logger) LectureService {
+func NewLectureService(
+	repo repository.LectureRepository,
+	userRepo repository.UserRepository,
+	usageRepo repository.UsageRepository,
+	s3Client *s3.Client,
+	bucketName string,
+	publisher pubsub.Publisher,
+	ingestionTopic string,
+	logger zerolog.Logger,
+) LectureService {
 	return &lectureService{
 		repo:           repo,
 		userRepo:       userRepo,
+		usageRepo:      usageRepo,
 		s3Client:       s3Client,
 		bucketName:     bucketName,
 		publisher:      publisher,
@@ -214,6 +230,11 @@ func (s *lectureService) CreateLectureWithPDF(ctx context.Context, courseID, use
 		}
 	}
 
+	// Record upload event for usage tracking
+	if err := s.usageRepo.RecordUploadEvent(ctx, userID); err != nil {
+		s.lectureLogger.Error().Err(err).Msg("Failed to record upload event")
+	}
+
 	return createdLecture, nil
 }
 
@@ -231,7 +252,12 @@ func (s *lectureService) GetPresignedURL(ctx context.Context, storagePath string
 	return resp.URL, nil
 }
 
-// Add CountLecturesByUser implementation
+// CheckAndRecordUpload enforces the upload limit and logs the event
+func (s *lectureService) CheckAndRecordUpload(ctx context.Context, userID string, start, end time.Time, maxUploads int) error {
+	return s.usageRepo.CheckAndRecordUpload(ctx, userID, start, end, maxUploads)
+}
+
+// CountLecturesByUser delegates to repository
 func (s *lectureService) CountLecturesByUser(ctx context.Context, userID string, start, end time.Time) (int, error) {
-	return s.repo.CountLecturesByUser(ctx, userID, start, end)
+	return s.usageRepo.CountUploadEvents(ctx, userID, start, end)
 }

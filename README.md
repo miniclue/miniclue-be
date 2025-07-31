@@ -1,21 +1,6 @@
 # miniclue-be
 
-A backend service for the miniclue application, providing APIs for managing courses and lectures using Go, Supabase, and AI-driven processing pipelines.
-
-## Table of Contents
-
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [Configuration](#configuration)
-- [Running the Application](#running-the-application)
-  - [API Server](#api-server)
-- [API Endpoints](#api-endpoints)
-- [Database Migrations](#database-migrations)
-- [Testing](#testing)
-- [Contributing](#contributing)
+A Go-based backend service for MiniClue, providing lecture processing, AI-powered explanations, and subscription management.
 
 ## Features
 
@@ -110,6 +95,12 @@ make run
 ```
 
 The API server will now be running and connected to the local Pub/Sub emulator.
+
+### 4. Set up Stripe listener locally
+
+```
+stripe listen --forward-to localhost:8080/v1/stripe/webhooks
+```
 
 ## API Endpoints
 

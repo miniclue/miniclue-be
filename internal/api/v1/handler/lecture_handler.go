@@ -371,13 +371,20 @@ func (h *LectureHandler) uploadLecture(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	// Parse multipart form using plan-defined max size
+	// Retrieve subscription and plan from context
+	subVal := r.Context().Value(middleware.SubscriptionContextKey)
+	sub, ok := subVal.(*model.UserSubscription)
+	if !ok || sub == nil {
+		http.Error(w, "Could not determine subscription from context", http.StatusInternalServerError)
+		return
+	}
 	planVal := r.Context().Value(middleware.PlanContextKey)
 	plan, ok := planVal.(*model.SubscriptionPlan)
 	if !ok || plan == nil {
 		http.Error(w, "Could not determine subscription plan", http.StatusInternalServerError)
 		return
 	}
+	// Parse multipart form using plan-defined max size
 	maxBytes := int64(plan.MaxSizeMB) << 20 // MB to bytes
 	if err := r.ParseMultipartForm(maxBytes); err != nil {
 		http.Error(w, "Error parsing multipart form: "+err.Error(), http.StatusBadRequest)
@@ -404,17 +411,28 @@ func (h *LectureHandler) uploadLecture(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "No files uploaded", http.StatusBadRequest)
 		return
 	}
-	// Optional common title
 	commonTitle := r.FormValue("title")
-	// Process each file
 	var results []dto.LectureUploadResponseDTO
+	// Use 207 Multi-Status to relay per-file successes/failures
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(207)
 	for _, header := range files {
+		// Atomically check and record before processing each file
+		if plan.MaxUploads > 0 {
+			err := h.lectureService.CheckAndRecordUpload(r.Context(), userID, sub.StartsAt, sub.EndsAt, plan.MaxUploads)
+			if err == service.ErrUploadLimitExceeded {
+				results = append(results, dto.LectureUploadResponseDTO{Filename: header.Filename, LectureID: "", Status: "upload_limit_exceeded"})
+				continue
+			} else if err != nil {
+				results = append(results, dto.LectureUploadResponseDTO{Filename: header.Filename, LectureID: "", Status: "error_recording_usage"})
+				continue
+			}
+		}
 		f, err := header.Open()
 		if err != nil {
-			http.Error(w, "Error opening file: "+err.Error(), http.StatusBadRequest)
-			return
+			results = append(results, dto.LectureUploadResponseDTO{Filename: header.Filename, LectureID: "", Status: "error_opening_file"})
+			continue
 		}
-		// Determine title per file
 		title := commonTitle
 		if title == "" {
 			title = header.Filename
@@ -424,18 +442,20 @@ func (h *LectureHandler) uploadLecture(w http.ResponseWriter, r *http.Request) {
 			h.logger.Warn().Err(err).Msg("Failed to close uploaded file part")
 		}
 		if err != nil {
-			http.Error(w, "Failed to create lecture: "+err.Error(), http.StatusInternalServerError)
-			return
+			results = append(results, dto.LectureUploadResponseDTO{Filename: header.Filename, LectureID: "", Status: "error_creating_lecture"})
+			continue
 		}
+		// Success: lecture created and usage event recorded, increment usage
+		// Note: upload event recording is handled atomically in handler via CheckAndRecordUpload
 		results = append(results, dto.LectureUploadResponseDTO{
+			Filename:  header.Filename,
 			LectureID: lec.ID,
 			Status:    lec.Status,
 		})
 	}
-	// Return array of responses
-	w.Header().Set("Content-Type", "application/json")
+	// Return array of per-file statuses
 	if err := json.NewEncoder(w).Encode(results); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to encode response")
+		h.logger.Error().Err(err).Msg("Failed to encode upload response")
 	}
 }
 
