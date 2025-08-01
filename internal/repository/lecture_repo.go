@@ -19,7 +19,8 @@ type LectureRepository interface {
 	DeleteLecture(ctx context.Context, lectureID string) error
 	UpdateLecture(ctx context.Context, l *model.Lecture) error
 	CreateLecture(ctx context.Context, lecture *model.Lecture) (*model.Lecture, error)
-	CountLecturesByUser(ctx context.Context, userID string, start, end time.Time) (int, error)
+	CountLecturesByUserInTimeRange(ctx context.Context, userID string, start, end time.Time) (int, error)
+	CountLecturesByUserID(ctx context.Context, userID string) (int, error)
 }
 
 type lectureRepository struct {
@@ -181,7 +182,7 @@ func (r *lectureRepository) CreateLecture(ctx context.Context, lecture *model.Le
 	return lecture, nil
 }
 
-func (r *lectureRepository) CountLecturesByUser(ctx context.Context, userID string, start, end time.Time) (int, error) {
+func (r *lectureRepository) CountLecturesByUserInTimeRange(ctx context.Context, userID string, start, end time.Time) (int, error) {
 	// Count actual lecture upload events rather than stored lectures
 	var count int
 	query := `
@@ -193,6 +194,16 @@ func (r *lectureRepository) CountLecturesByUser(ctx context.Context, userID stri
 			AND created_at < $3
 	`
 	err := r.pool.QueryRow(ctx, query, userID, start, end).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("counting lectures for user %s: %w", userID, err)
+	}
+	return count, nil
+}
+
+func (r *lectureRepository) CountLecturesByUserID(ctx context.Context, userID string) (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM lectures WHERE user_id = $1`
+	err := r.pool.QueryRow(ctx, query, userID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("counting lectures for user %s: %w", userID, err)
 	}

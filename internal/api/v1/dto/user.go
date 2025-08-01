@@ -30,6 +30,11 @@ type UserRecentLectureResponseDTO struct {
 	Title     string `json:"title"`
 }
 
+type UserRecentLecturesResponseDTO struct {
+	Lectures   []UserRecentLectureResponseDTO `json:"lectures"`
+	TotalCount int                            `json:"total_count"`
+}
+
 type UserUsageResponseDTO struct {
 	UserID             string    `json:"user_id"`
 	CurrentUsage       int       `json:"current_usage"`

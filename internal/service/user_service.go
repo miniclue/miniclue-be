@@ -18,7 +18,7 @@ var (
 type UserService interface {
 	Create(ctx context.Context, u *model.User) (*model.User, error)
 	Get(ctx context.Context, id string) (*model.User, error)
-	GetRecentLectures(ctx context.Context, userID string, limit, offset int) ([]model.Lecture, error)
+	GetRecentLecturesWithCount(ctx context.Context, userID string, limit, offset int) ([]model.Lecture, int, error)
 	GetCourses(ctx context.Context, userID string) ([]model.Course, error)
 	GetUsage(ctx context.Context, userID string) (*model.UserUsage, error)
 }
@@ -92,13 +92,22 @@ func (s *userService) GetCourses(ctx context.Context, userID string) ([]model.Co
 	return courses, nil
 }
 
-func (s *userService) GetRecentLectures(ctx context.Context, userID string, limit, offset int) ([]model.Lecture, error) {
+func (s *userService) GetRecentLecturesWithCount(ctx context.Context, userID string, limit, offset int) ([]model.Lecture, int, error) {
+	// Get lectures with pagination
 	lectures, err := s.lectureRepo.GetLecturesByUserID(ctx, userID, limit, offset)
 	if err != nil {
 		s.userLogger.Error().Err(err).Str("user_id", userID).Msg("Failed to get recent lectures by user ID")
-		return nil, err
+		return nil, 0, err
 	}
-	return lectures, nil
+
+	// Get total count
+	totalCount, err := s.lectureRepo.CountLecturesByUserID(ctx, userID)
+	if err != nil {
+		s.userLogger.Error().Err(err).Str("user_id", userID).Msg("Failed to get lecture count by user ID")
+		return nil, 0, err
+	}
+
+	return lectures, totalCount, nil
 }
 
 func (s *userService) GetUsage(ctx context.Context, userID string) (*model.UserUsage, error) {

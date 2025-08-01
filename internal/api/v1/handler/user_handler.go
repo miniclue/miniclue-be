@@ -34,7 +34,7 @@ func NewUserHandler(userService service.UserService, v *validator.Validate, logg
 func (h *UserHandler) RegisterRoutes(mux *http.ServeMux, authMw func(http.Handler) http.Handler) {
 	mux.Handle("/users/me", authMw(http.HandlerFunc(h.handleUsers)))
 	mux.Handle("/users/me/courses", authMw(http.HandlerFunc(h.getUserCourses)))
-	mux.Handle("/users/me/recents", authMw(http.HandlerFunc(h.getRecentLectures)))
+	mux.Handle("/users/me/recents", authMw(http.HandlerFunc(h.getRecentLecturesWithCount)))
 	mux.Handle("/users/me/usage", authMw(http.HandlerFunc(h.getUserUsage)))
 }
 
@@ -206,18 +206,18 @@ func (h *UserHandler) getUserCourses(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// getRecentLectures godoc
-// @Summary Get recent lectures
-// @Description Retrieves a list of recently viewed lectures for the authenticated user.
+// getRecentLecturesWithCount godoc
+// @Summary Get recent lectures with count
+// @Description Retrieves a list of recently viewed lectures for the authenticated user with total count.
 // @Tags users
 // @Produce json
 // @Param limit query int false "Number of lectures to return (default 10)"
 // @Param offset query int false "Offset for pagination (default 0)"
-// @Success 200 {array} dto.UserRecentLectureResponseDTO
+// @Success 200 {object} dto.UserRecentLecturesResponseDTO
 // @Failure 401 {string} string "Unauthorized: user ID not found in context"
 // @Failure 500 {string} string "Failed to retrieve recent lectures"
 // @Router /users/me/recents [get]
-func (h *UserHandler) getRecentLectures(w http.ResponseWriter, r *http.Request) {
+func (h *UserHandler) getRecentLecturesWithCount(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -250,8 +250,8 @@ func (h *UserHandler) getRecentLectures(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	// 3. Call service to get recent lectures
-	lectures, err := h.userService.GetRecentLectures(r.Context(), userID, limit, offset)
+	// 3. Call service to get recent lectures with count
+	lectures, totalCount, err := h.userService.GetRecentLecturesWithCount(r.Context(), userID, limit, offset)
 	if err != nil {
 		http.Error(w, "Failed to retrieve recent lectures: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -266,10 +266,16 @@ func (h *UserHandler) getRecentLectures(w http.ResponseWriter, r *http.Request) 
 		})
 	}
 
-	// 5. Return response
+	// 5. Create response with lectures and total count
+	response := dto.UserRecentLecturesResponseDTO{
+		Lectures:   lectureDTOs,
+		TotalCount: totalCount,
+	}
+
+	// 6. Return response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(lectureDTOs); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		h.logger.Error().Err(err).Msg("Failed to encode response")
 	}
 }
