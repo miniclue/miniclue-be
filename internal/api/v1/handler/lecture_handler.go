@@ -9,7 +9,6 @@ import (
 	"app/internal/api/v1/dto"
 	"app/internal/middleware"
 	"app/internal/model"
-	"app/internal/repository"
 	"app/internal/service"
 
 	"github.com/go-playground/validator/v10"
@@ -95,6 +94,14 @@ func (h *LectureHandler) handleLecture(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		if strings.HasSuffix(path, "/note") {
 			h.createLectureNote(w, r)
+			return
+		}
+		if strings.HasSuffix(path, "/upload-complete") {
+			h.completeUpload(w, r)
+			return
+		}
+		if strings.HasSuffix(path, "/batch-upload-url") {
+			h.getBatchUploadURL(w, r)
 			return
 		}
 	case http.MethodDelete:
@@ -280,13 +287,11 @@ func (h *LectureHandler) deleteLecture(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// handleLectures routes GET for listing and POST for uploading PDFs
+// handleLectures routes GET for listing lectures
 func (h *LectureHandler) handleLectures(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		h.listLectures(w, r)
-	case http.MethodPost:
-		h.uploadLecture(w, r)
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
@@ -360,120 +365,6 @@ func (h *LectureHandler) listLectures(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		h.logger.Error().Err(err).Msg("Failed to encode response")
-	}
-}
-
-// uploadLecture godoc
-// @Summary Upload lecture PDFs
-// @Description Uploads one or more PDF files to create new lectures under the specified course.
-// @Tags lectures
-// @Accept multipart/form-data
-// @Produce json
-// @Param course_id formData string true "Course ID"
-// @Param title formData string false "Lecture title (used as default for all files)"
-// @Param files formData []file true "PDF files" collectionFormat(multi)
-// @Success 201 {array} dto.LectureUploadResponseDTO
-// @Failure 400 {string} string "Bad Request"
-// @Failure 401 {string} string "Unauthorized: User ID not found in context"
-// @Failure 404 {string} string "Course not found or access denied"
-// @Failure 500 {string} string "Failed to upload lecture PDFs"
-// @Router /lectures [post]
-func (h *LectureHandler) uploadLecture(w http.ResponseWriter, r *http.Request) {
-	// Authenticate
-	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
-	if !ok || userID == "" {
-		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
-		return
-	}
-	// Only POST /lectures
-	if r.Method != http.MethodPost || r.URL.Path != "/lectures" {
-		http.NotFound(w, r)
-		return
-	}
-	// Retrieve subscription and plan from context
-	subVal := r.Context().Value(middleware.SubscriptionContextKey)
-	sub, ok := subVal.(*model.UserSubscription)
-	if !ok || sub == nil {
-		http.Error(w, "Could not determine subscription from context", http.StatusInternalServerError)
-		return
-	}
-	planVal := r.Context().Value(middleware.PlanContextKey)
-	plan, ok := planVal.(*model.SubscriptionPlan)
-	if !ok || plan == nil {
-		http.Error(w, "Could not determine subscription plan", http.StatusInternalServerError)
-		return
-	}
-	// Parse multipart form using plan-defined max size
-	maxBytes := int64(plan.MaxSizeMB) << 20 // MB to bytes
-	if err := r.ParseMultipartForm(maxBytes); err != nil {
-		http.Error(w, "Error parsing multipart form: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	// Get course ID and verify access
-	courseID := r.FormValue("course_id")
-	if courseID == "" {
-		http.Error(w, "Missing course_id", http.StatusBadRequest)
-		return
-	}
-	course, err := h.courseService.GetCourseByID(r.Context(), courseID)
-	if err != nil {
-		http.Error(w, "Failed to retrieve course: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if course == nil || course.UserID != userID {
-		http.Error(w, "Course not found or access denied", http.StatusNotFound)
-		return
-	}
-	// Gather multiple files
-	files := r.MultipartForm.File["files"]
-	if len(files) == 0 {
-		http.Error(w, "No files uploaded", http.StatusBadRequest)
-		return
-	}
-	commonTitle := r.FormValue("title")
-	var results []dto.LectureUploadResponseDTO
-	// Use 207 Multi-Status to relay per-file successes/failures
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(207)
-	for _, header := range files {
-		// Atomically check and record upload limit before processing each file
-		// Always record usage events, even for unlimited plans (MaxUploads = -1)
-		err := h.lectureService.CheckAndRecordUpload(r.Context(), userID, sub.StartsAt, sub.EndsAt, plan.MaxUploads)
-		if err == repository.ErrUploadLimitExceeded {
-			results = append(results, dto.LectureUploadResponseDTO{Filename: header.Filename, LectureID: "", Status: "upload_limit_exceeded"})
-			continue
-		} else if err != nil {
-			results = append(results, dto.LectureUploadResponseDTO{Filename: header.Filename, LectureID: "", Status: "error_recording_usage"})
-			continue
-		}
-		f, err := header.Open()
-		if err != nil {
-			results = append(results, dto.LectureUploadResponseDTO{Filename: header.Filename, LectureID: "", Status: "error_opening_file"})
-			continue
-		}
-		title := commonTitle
-		if title == "" {
-			title = header.Filename
-		}
-		lec, err := h.lectureService.CreateLectureWithPDF(r.Context(), courseID, userID, title, f, header)
-		if err := f.Close(); err != nil {
-			h.logger.Warn().Err(err).Msg("Failed to close uploaded file part")
-		}
-		if err != nil {
-			results = append(results, dto.LectureUploadResponseDTO{Filename: header.Filename, LectureID: "", Status: "error_creating_lecture"})
-			continue
-		}
-		// Note: Upload event recording is handled atomically in CheckAndRecordUpload
-		// to prevent race conditions with concurrent uploads
-		results = append(results, dto.LectureUploadResponseDTO{
-			Filename:  header.Filename,
-			LectureID: lec.ID,
-			Status:    lec.Status,
-		})
-	}
-	// Return array of per-file statuses
-	if err := json.NewEncoder(w).Encode(results); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to encode upload response")
 	}
 }
 
@@ -614,7 +505,7 @@ func (h *LectureHandler) listLectureExplanations(w http.ResponseWriter, r *http.
 // @Failure 401 {string} string "Unauthorized: User ID not found in context"
 // @Failure 404 {string} string "Lecture not found"
 // @Failure 500 {string} string "Failed to update note"
-// @Router /lectures/{lectureId}/notes [patch]
+// @Router /lectures/{lectureId}/note [patch]
 func (h *LectureHandler) updateLectureNote(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
 	if !ok || userID == "" {
@@ -680,7 +571,7 @@ func (h *LectureHandler) updateLectureNote(w http.ResponseWriter, r *http.Reques
 // @Failure 401 {string} string "Unauthorized: User ID not found in context"
 // @Failure 404 {string} string "Lecture not found"
 // @Failure 500 {string} string "Failed to create note"
-// @Router /lectures/{lectureId}/notes [post]
+// @Router /lectures/{lectureId}/note [post]
 func (h *LectureHandler) createLectureNote(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
 	if !ok || userID == "" {
@@ -778,6 +669,182 @@ func (h *LectureHandler) getSignedURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := dto.SignedURLResponseDTO{URL: url}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
+}
+
+// getBatchUploadURL godoc
+// @Summary Get upload URLs for lectures
+// @Description Initiates lecture uploads by creating lecture records and returning presigned URLs for direct S3 upload. Works for both single and multiple files.
+// @Tags lectures
+// @Accept json
+// @Produce json
+// @Param request body dto.LectureUploadURLRequestDTO true "Upload URL request"
+// @Success 201 {object} dto.LectureBatchUploadURLResponseDTO
+// @Failure 400 {string} string "Invalid JSON payload or validation failed"
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 403 {string} string "Upload limit exceeded"
+// @Failure 404 {string} string "Course not found or access denied"
+// @Failure 500 {string} string "Failed to create upload URLs"
+// @Router /lectures/batch-upload-url [post]
+func (h *LectureHandler) getBatchUploadURL(w http.ResponseWriter, r *http.Request) {
+	// Authenticate
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse request body
+	var req dto.LectureUploadURLRequestDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Validate request
+	if err := h.validate.Struct(&req); err != nil {
+		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Verify course exists and user has access
+	course, err := h.courseService.GetCourseByID(r.Context(), req.CourseID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve course: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if course == nil || course.UserID != userID {
+		http.Error(w, "Course not found or access denied", http.StatusNotFound)
+		return
+	}
+
+	// Retrieve subscription and plan from context
+	subVal := r.Context().Value(middleware.SubscriptionContextKey)
+	sub, ok := subVal.(*model.UserSubscription)
+	if !ok || sub == nil {
+		http.Error(w, "Could not determine subscription from context", http.StatusInternalServerError)
+		return
+	}
+	planVal := r.Context().Value(middleware.PlanContextKey)
+	plan, ok := planVal.(*model.SubscriptionPlan)
+	if !ok || plan == nil {
+		http.Error(w, "Could not determine subscription plan", http.StatusInternalServerError)
+		return
+	}
+
+	// Check if user has enough upload quota for all files
+	requiredUploads := len(req.Filenames)
+	if plan.MaxUploads != -1 { // -1 means unlimited
+		currentUploads, err := h.lectureService.CountLecturesByUserInTimeRange(r.Context(), userID, sub.StartsAt, sub.EndsAt)
+		if err != nil {
+			http.Error(w, "Failed to check upload quota: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if currentUploads+requiredUploads > plan.MaxUploads {
+			http.Error(w, "Upload limit exceeded", http.StatusForbidden)
+			return
+		}
+	}
+
+	// Initiate batch upload
+	lectures, presignedURLs, err := h.lectureService.InitiateBatchUpload(r.Context(), req.CourseID, userID, req.Filenames)
+	if err != nil {
+		http.Error(w, "Failed to create batch upload URLs: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Record upload events for all files (quota already checked above)
+	for i := 0; i < len(req.Filenames); i++ {
+		err := h.lectureService.RecordUploadEvent(r.Context(), userID, lectures[i].ID)
+		if err != nil {
+			// If recording fails, clean up created lectures
+			for _, lecture := range lectures {
+				_ = h.lectureService.DeleteLecture(r.Context(), lecture.ID)
+			}
+			http.Error(w, "Failed to record upload events: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Build response
+	var uploads []dto.LectureUploadURLResponseDTO
+	for i, lecture := range lectures {
+		uploads = append(uploads, dto.LectureUploadURLResponseDTO{
+			LectureID: lecture.ID,
+			UploadURL: presignedURLs[i],
+		})
+	}
+
+	resp := dto.LectureBatchUploadURLResponseDTO{
+		Uploads: uploads,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
+}
+
+// completeUpload godoc
+// @Summary Complete lecture upload
+// @Description Finalizes a lecture upload by verifying the file exists in storage and triggering processing.
+// @Tags lectures
+// @Accept json
+// @Produce json
+// @Param lectureId path string true "Lecture ID"
+// @Param request body dto.LectureUploadCompleteRequestDTO true "Upload complete request"
+// @Success 200 {object} dto.LectureUploadCompleteResponseDTO
+// @Failure 400 {string} string "Invalid JSON payload"
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "Lecture not found or access denied"
+// @Failure 500 {string} string "Failed to complete upload"
+// @Router /lectures/{lectureId}/upload-complete [post]
+func (h *LectureHandler) completeUpload(w http.ResponseWriter, r *http.Request) {
+	// Authenticate
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// Extract lecture ID from path
+	lectureID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/lectures/"), "/upload-complete")
+
+	// Verify lecture exists and user has access
+	lecture, err := h.lectureService.GetLectureByID(r.Context(), lectureID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve lecture: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if lecture == nil {
+		http.Error(w, "Lecture not found", http.StatusNotFound)
+		return
+	}
+
+	// Verify user owns the course
+	course, err := h.courseService.GetCourseByID(r.Context(), lecture.CourseID)
+	if err != nil || course == nil || course.UserID != userID {
+		http.Error(w, "Lecture not found", http.StatusNotFound)
+		return
+	}
+
+	// Complete the upload
+	updatedLecture, err := h.lectureService.CompleteUpload(r.Context(), lectureID, userID)
+	if err != nil {
+		http.Error(w, "Failed to complete upload: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := dto.LectureUploadCompleteResponseDTO{
+		LectureID: updatedLecture.ID,
+		Status:    updatedLecture.Status,
+		Message:   "Upload completed successfully. Processing has been initiated.",
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		h.logger.Error().Err(err).Msg("Failed to encode response")

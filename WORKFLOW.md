@@ -276,15 +276,17 @@ The new system is designed around two parallel processing tracks that start afte
 
 # The Full Data Flow, Step-by-Step
 
-## Step 1: User Uploads a Lecture
+## Step 1: User Initiates Upload
 
-- **Trigger:** The user selects a PDF file and clicks "Upload" in the Next.js application.
+- **Trigger:** The user selects one or more PDF files and clicks "Upload" in the Next.js application.
 - **Action:**
-  1.  The request, containing the PDF file, is sent to your Go API Gateway.
-  2.  The Go API immediately creates a new record in the `lectures` table with a status of `uploading`.
-  3.  It then uploads the PDF file directly to Supabase Storage in a dedicated folder for that lecture.
-  4.  Once the upload is successful, it updates the `lectures` record with the file's storage path and changes the status to `pending_processing`.
-  5.  Finally, it publishes a single message to the Google Cloud Pub/Sub topic named `ingestion`. This message contains the unique ID of the lecture, kicking off the entire automated pipeline.
+  1.  The frontend sends a `POST` request to `/v1/lectures/batch-upload-url` with the course ID and filenames.
+  2.  The Go API validates the user's subscription quota and course access.
+  3.  For each file, the API creates a new record in the `lectures` table with a status of `uploading`.
+  4.  The API generates presigned URLs for direct S3 uploads and returns them to the frontend.
+  5.  The frontend uploads each PDF file directly to S3 using the provided presigned URLs.
+  6.  Once all uploads are complete, the frontend calls `POST /v1/lectures/{lectureId}/upload-complete` for each lecture.
+  7.  The API verifies the S3 file exists, updates the lecture status to `pending_processing`, and publishes a message to the Google Cloud Pub/Sub topic named `ingestion`. This message contains the unique ID of the lecture, kicking off the entire automated pipeline.
 
 ## Step 2: Ingestion and Dispatch Workflow
 

@@ -23,8 +23,8 @@ const SubscriptionContextKey subscriptionContextKey = "userSubscription"
 func SubscriptionLimitMiddleware(subSvc service.SubscriptionService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Only prepare plan context for POST /lectures
-			if r.Method == http.MethodPost && r.URL.Path == "/lectures" {
+			// Only prepare plan context for POST /lectures and POST /lectures/batch-upload-url
+			if r.Method == http.MethodPost && (r.URL.Path == "/lectures" || r.URL.Path == "/lectures/batch-upload-url") {
 				userID, ok := r.Context().Value(UserContextKey).(string)
 				if !ok || userID == "" {
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)

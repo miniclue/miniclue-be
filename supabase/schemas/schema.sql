@@ -285,6 +285,7 @@ CREATE TABLE IF NOT EXISTS usage_events (
   id           UUID              PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id      UUID              NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   event_type   usage_event_type  NOT NULL,
+  lecture_id   UUID              REFERENCES lectures(id) ON DELETE SET NULL,
   created_at   TIMESTAMPTZ       NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_usage_events_user_event_time 
