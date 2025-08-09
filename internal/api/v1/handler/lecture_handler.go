@@ -841,6 +841,7 @@ func (h *LectureHandler) completeUpload(w http.ResponseWriter, r *http.Request) 
 
 	resp := dto.LectureUploadCompleteResponseDTO{
 		LectureID: updatedLecture.ID,
+		CourseID:  updatedLecture.CourseID,
 		Status:    updatedLecture.Status,
 		Message:   "Upload completed successfully. Processing has been initiated.",
 	}
