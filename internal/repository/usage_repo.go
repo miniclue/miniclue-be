@@ -2,15 +2,11 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-// ErrUploadLimitExceeded is returned when a user has reached their upload limit.
-var ErrUploadLimitExceeded = errors.New("upload_limit_exceeded")
 
 // UsageRepository tracks user actions for usage-based limits.
 type UsageRepository interface {

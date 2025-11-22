@@ -40,16 +40,6 @@ type Config struct {
 	// For staging/prod, these should be the base URL of your API gateway (e.g., https://api.miniclue.com)
 	APIBaseURLStaging string `envconfig:"API_BASE_URL_STAGING"`
 	APIBaseURLProd    string `envconfig:"API_BASE_URL_PROD"`
-
-	// Stripe
-	StripeSecretKey          string `envconfig:"STRIPE_SECRET_KEY" required:"true"`
-	StripeWebhookSecret      string `envconfig:"STRIPE_WEBHOOK_SECRET" required:"true"`
-	StripePriceMonthly       string `envconfig:"STRIPE_PRICE_MONTHLY" required:"true"`
-	StripePriceAnnual        string `envconfig:"STRIPE_PRICE_ANNUAL" required:"true"`
-	StripePriceMonthlyLaunch string `envconfig:"STRIPE_PRICE_MONTHLY_LAUNCH" required:"true"`
-	StripePriceAnnualLaunch  string `envconfig:"STRIPE_PRICE_ANNUAL_LAUNCH" required:"true"`
-	StripePriceFree          string `envconfig:"STRIPE_PRICE_FREE" default:"free"`
-	StripePortalReturnURL    string `envconfig:"STRIPE_PORTAL_RETURN_URL" required:"true"`
 }
 
 func Load() (*Config, error) {

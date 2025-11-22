@@ -20,33 +20,27 @@ type UserService interface {
 	Get(ctx context.Context, id string) (*model.User, error)
 	GetRecentLecturesWithCount(ctx context.Context, userID string, limit, offset int) ([]model.Lecture, int, error)
 	GetCourses(ctx context.Context, userID string) ([]model.Course, error)
-	GetUsage(ctx context.Context, userID string) (*model.UserUsage, error)
 }
 
 type userService struct {
-	userRepo         repository.UserRepository
-	courseRepo       repository.CourseRepository
-	lectureRepo      repository.LectureRepository
-	subscriptionRepo repository.SubscriptionRepository
-	stripeSvc        *StripeService
-	userLogger       zerolog.Logger
+	userRepo    repository.UserRepository
+	courseRepo  repository.CourseRepository
+	lectureRepo repository.LectureRepository
+	userLogger  zerolog.Logger
 }
 
-func NewUserService(userRepo repository.UserRepository, courseRepo repository.CourseRepository, lectureRepo repository.LectureRepository, subscriptionRepo repository.SubscriptionRepository, stripeSvc *StripeService, logger zerolog.Logger) UserService {
-	// subscriptionRepo used to onboard new users to beta plan
+func NewUserService(userRepo repository.UserRepository, courseRepo repository.CourseRepository, lectureRepo repository.LectureRepository, logger zerolog.Logger) UserService {
 	return &userService{
-		userRepo:         userRepo,
-		courseRepo:       courseRepo,
-		lectureRepo:      lectureRepo,
-		subscriptionRepo: subscriptionRepo,
-		stripeSvc:        stripeSvc,
-		userLogger:       logger.With().Str("service", "UserService").Logger(),
+		userRepo:    userRepo,
+		courseRepo:  courseRepo,
+		lectureRepo: lectureRepo,
+		userLogger:  logger.With().Str("service", "UserService").Logger(),
 	}
 }
 
 func (s *userService) Create(ctx context.Context, u *model.User) (*model.User, error) {
 	// Check if user already exists first
-	existingUser, err := s.userRepo.GetUserByID(ctx, u.UserID)
+	_, err := s.userRepo.GetUserByID(ctx, u.UserID)
 	if err != nil && !errors.Is(err, ErrUserNotFound) {
 		s.userLogger.Error().Err(err).Str("user_id", u.UserID).Msg("Failed to check if user exists")
 		return nil, err
@@ -58,27 +52,6 @@ func (s *userService) Create(ctx context.Context, u *model.User) (*model.User, e
 		s.userLogger.Error().Err(err).Str("user_id", u.UserID).Msg("Failed to create/update user")
 		return nil, err
 	}
-
-	// Only create Stripe customer and assign subscription for new users
-	if existingUser == nil {
-		// Create Stripe customer (non-blocking - if it fails, user can still use the app)
-		if s.stripeSvc != nil {
-			customerID, err := s.stripeSvc.CreateCustomer(ctx, u)
-			if err != nil {
-				s.userLogger.Warn().Err(err).Str("user_id", u.UserID).Msg("Failed to create Stripe customer during signup - user can still use the app")
-				// Don't return error - user can still use the app without Stripe customer
-			} else {
-				s.userLogger.Info().Str("user_id", u.UserID).Str("stripe_customer_id", customerID).Msg("Created Stripe customer during signup")
-			}
-		}
-
-		// Onboard new user to default subscription (currently 'beta')
-		if err := s.subscriptionRepo.UpsertSubscription(ctx, u.UserID, "beta"); err != nil {
-			s.userLogger.Error().Err(err).Str("user_id", u.UserID).Msg("Failed to assign subscription")
-			return nil, err
-		}
-	}
-	// User already exists, no need to log this normal business flow
 
 	return u, nil
 }
@@ -120,13 +93,4 @@ func (s *userService) GetRecentLecturesWithCount(ctx context.Context, userID str
 	}
 
 	return lectures, totalCount, nil
-}
-
-func (s *userService) GetUsage(ctx context.Context, userID string) (*model.UserUsage, error) {
-	usage, err := s.userRepo.GetUserUsage(ctx, userID)
-	if err != nil {
-		s.userLogger.Error().Err(err).Str("user_id", userID).Msg("Failed to get usage for user")
-		return nil, err
-	}
-	return usage, nil
 }

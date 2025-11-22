@@ -16,9 +16,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// ErrUploadLimitExceeded is returned when a user has reached their upload limit.
-var ErrUploadLimitExceeded = repository.ErrUploadLimitExceeded
-
 // LectureService defines lecture-related operations
 // GetLecturesByCourseID retrieves lectures for a given course with pagination
 type LectureService interface {

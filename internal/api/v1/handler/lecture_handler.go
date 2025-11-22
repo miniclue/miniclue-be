@@ -8,7 +8,6 @@ import (
 
 	"app/internal/api/v1/dto"
 	"app/internal/middleware"
-	"app/internal/model"
 	"app/internal/service"
 
 	"github.com/go-playground/validator/v10"
@@ -54,14 +53,10 @@ func NewLectureHandler(
 	}
 }
 
-// RegisterRoutes mounts lecture routes under /lectures/{id} with auth and subscription limit middlewares
-func (h *LectureHandler) RegisterRoutes(mux *http.ServeMux, authMw func(http.Handler) http.Handler, subMw func(http.Handler) http.Handler) {
-	// Combine auth and subscription middlewares
-	chain := func(next http.Handler) http.Handler {
-		return authMw(subMw(next))
-	}
-	mux.Handle("/lectures", chain(http.HandlerFunc(h.handleLectures)))
-	mux.Handle("/lectures/", chain(http.HandlerFunc(h.handleLecture)))
+// RegisterRoutes mounts lecture routes under /lectures/{id} with auth middleware
+func (h *LectureHandler) RegisterRoutes(mux *http.ServeMux, authMw func(http.Handler) http.Handler) {
+	mux.Handle("/lectures", authMw(http.HandlerFunc(h.handleLectures)))
+	mux.Handle("/lectures/", authMw(http.HandlerFunc(h.handleLecture)))
 }
 
 func (h *LectureHandler) handleLecture(w http.ResponseWriter, r *http.Request) {
@@ -721,34 +716,6 @@ func (h *LectureHandler) getBatchUploadURL(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Retrieve subscription and plan from context
-	subVal := r.Context().Value(middleware.SubscriptionContextKey)
-	sub, ok := subVal.(*model.UserSubscription)
-	if !ok || sub == nil {
-		http.Error(w, "Could not determine subscription from context", http.StatusInternalServerError)
-		return
-	}
-	planVal := r.Context().Value(middleware.PlanContextKey)
-	plan, ok := planVal.(*model.SubscriptionPlan)
-	if !ok || plan == nil {
-		http.Error(w, "Could not determine subscription plan", http.StatusInternalServerError)
-		return
-	}
-
-	// Check if user has enough upload quota for all files
-	requiredUploads := len(req.Filenames)
-	if plan.MaxUploads != -1 { // -1 means unlimited
-		currentUploads, err := h.lectureService.CountLecturesByUserInTimeRange(r.Context(), userID, sub.StartsAt, sub.EndsAt)
-		if err != nil {
-			http.Error(w, "Failed to check upload quota: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if currentUploads+requiredUploads > plan.MaxUploads {
-			http.Error(w, "Upload limit exceeded", http.StatusForbidden)
-			return
-		}
-	}
-
 	// Initiate batch upload
 	lectures, presignedURLs, err := h.lectureService.InitiateBatchUpload(r.Context(), req.CourseID, userID, req.Filenames)
 	if err != nil {
@@ -756,7 +723,7 @@ func (h *LectureHandler) getBatchUploadURL(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Record upload events for all files (quota already checked above)
+	// Record upload events for all files
 	for i := 0; i < len(req.Filenames); i++ {
 		err := h.lectureService.RecordUploadEvent(r.Context(), userID, lectures[i].ID)
 		if err != nil {

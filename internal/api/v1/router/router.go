@@ -109,11 +109,8 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	explanationRepo := repository.NewExplanationRepository(pool)
 	noteRepo := repository.NewNoteRepository(pool)
 	dlqRepo := repository.NewDLQRepository(pool)
-	subscriptionRepo := repository.NewSubscriptionRepo(pool)
 
-	subscriptionSvc := service.NewSubscriptionService(subscriptionRepo, logger)
-	stripeSvc := service.NewStripeService(cfg, userRepo, subscriptionSvc, logger)
-	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo, subscriptionRepo, stripeSvc, logger)
+	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo, logger)
 	lectureSvc := service.NewLectureService(lectureRepo, userRepo, usageRepo, s3Client, cfg.S3Bucket, pubSubPublisher, cfg.PubSubIngestionTopic, logger)
 	courseSvc := service.NewCourseService(courseRepo, lectureSvc, logger)
 	summarySvc := service.NewSummaryService(summaryRepo, logger)
@@ -121,18 +118,15 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	noteSvc := service.NewNoteService(noteRepo, logger)
 	dlqSvc := service.NewDLQService(dlqRepo, logger)
 
-	userHandler := handler.NewUserHandler(userSvc, subscriptionSvc, validate, logger)
+	userHandler := handler.NewUserHandler(userSvc, validate, logger)
 	courseHandler := handler.NewCourseHandler(courseSvc, validate, logger)
 	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, summarySvc, explanationSvc, noteSvc, validate, cfg.S3URL, cfg.S3Bucket, logger)
 	dlqHandler := handler.NewDLQHandler(dlqSvc, logger)
-	subscriptionHandler := handler.NewSubscriptionHandler(stripeSvc, subscriptionSvc, logger)
-	stripeHandler := handler.NewStripeHandler(stripeSvc)
 
 	// 7. Initialize middleware
 	authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)
 	isLocalDev := cfg.PubSubEmulatorHost != ""
 	pubsubAuthMiddleware := middleware.PubSubAuthMiddleware(isLocalDev, cfg.DLQEndpointURL, cfg.PubSubPushServiceAccountEmail, logger)
-	subscriptionMiddleware := middleware.SubscriptionLimitMiddleware(subscriptionSvc)
 
 	// 8. Create ServeMux router
 	mux := http.NewServeMux()
@@ -141,10 +135,8 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	apiV1Mux := http.NewServeMux()
 	userHandler.RegisterRoutes(apiV1Mux, authMiddleware)
 	courseHandler.RegisterRoutes(apiV1Mux, authMiddleware)
-	lectureHandler.RegisterRoutes(apiV1Mux, authMiddleware, subscriptionMiddleware)
+	lectureHandler.RegisterRoutes(apiV1Mux, authMiddleware)
 	dlqHandler.RegisterRoutes(apiV1Mux, pubsubAuthMiddleware)
-	subscriptionHandler.RegisterRoutes(apiV1Mux, authMiddleware)
-	stripeHandler.RegisterRoutes(apiV1Mux)
 
 	// Mount the API v1 routes under /v1
 	mux.Handle("/v1/", http.StripPrefix("/v1", apiV1Mux))

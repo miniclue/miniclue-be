@@ -51,7 +51,7 @@ go mod download
 1.  Set up your Supabase project locally or in the cloud.
 2.  Export the required environment variables. See `.env.example` for reference.
 
-## Running the Application
+## Local Development
 
 ### 1. Start Local Services (Local Development Only)
 
@@ -96,16 +96,19 @@ make run
 
 The API server will now be running and connected to the local Pub/Sub emulator.
 
-### 4. Set up Stripe listener locally
+### 4. Update swagger documentation
 
+```bash
+make swagger
 ```
-stripe listen --forward-to localhost:8080/v1/stripe/webhooks
-```
 
-## API Endpoints
+This will generate the `swagger.json` file in the `docs` directory.
 
-Refer to `internal/api/v1/router/router.go` for detailed endpoint documentation.
-You can also generate Swagger documentation by running `make swagger`.
+### 5. Update local Supabase database
+
+- Make updates to the `supabase/schemas/schema.sql` file.
+- Run `supabase db diff -f [filename]` to generate a migration file.
+- Run `supabase migration up` to apply the migration to the local database.
 
 ## CI/CD Workflow
 

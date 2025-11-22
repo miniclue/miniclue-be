@@ -10,7 +10,7 @@
 .env.staging
 
 # Ignore swagger docs
-docs/swagger
+docs
 
 # Ignore bin
 bin
