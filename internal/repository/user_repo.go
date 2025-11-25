@@ -57,17 +57,10 @@ func (r *userRepo) GetUserByID(ctx context.Context, id string) (*model.User, err
 }
 
 func (r *userRepo) UpdateAPIKeyFlag(ctx context.Context, userID string, provider string, hasKey bool) error {
-	// Use jsonb_set to update a specific key in the JSONB object
-	// Construct the JSONB boolean value in Go to avoid PostgreSQL type inference issues
-	valueJSON, err := json.Marshal(hasKey)
-	if err != nil {
-		return fmt.Errorf("marshaling boolean value: %w", err)
-	}
-
-	// Use ARRAY[] constructor to pass the path as a proper text array
-	// jsonb_set expects a text[] array, not a string representation
-	query := `UPDATE user_profiles SET api_keys_provided = jsonb_set(COALESCE(api_keys_provided, '{}'::jsonb), ARRAY[$1], $2::jsonb, true), updated_at = NOW() WHERE user_id = $3`
-	result, err := r.pool.Exec(ctx, query, provider, valueJSON, userID)
+	// Use jsonb_set with to_jsonb to properly convert the boolean to JSONB
+	// This avoids issues with JSON marshaling and type casting in PostgreSQL
+	query := `UPDATE user_profiles SET api_keys_provided = jsonb_set(COALESCE(api_keys_provided, '{}'::jsonb), ARRAY[$1], to_jsonb($2::boolean), true), updated_at = NOW() WHERE user_id = $3`
+	result, err := r.pool.Exec(ctx, query, provider, hasKey, userID)
 	if err != nil {
 		return fmt.Errorf("updating API key flag for user %s, provider %s: %w", userID, provider, err)
 	}
