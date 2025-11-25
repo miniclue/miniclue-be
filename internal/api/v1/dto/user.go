@@ -9,12 +9,23 @@ type UserCreateDTO struct {
 }
 
 type UserResponseDTO struct {
-	UserID    string    `json:"user_id"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	AvatarURL string    `json:"avatar_url"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	UserID          string          `json:"user_id"`
+	Name            string          `json:"name"`
+	Email           string          `json:"email"`
+	AvatarURL       string          `json:"avatar_url"`
+	APIKeysProvided map[string]bool `json:"api_keys_provided"`
+	CreatedAt       time.Time       `json:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at"`
+}
+
+type APIKeyRequestDTO struct {
+	Provider string `json:"provider" validate:"required,oneof=openai gemini"`
+	APIKey   string `json:"api_key" validate:"required"`
+}
+
+type APIKeyResponseDTO struct {
+	Provider       string `json:"provider"`
+	HasProvidedKey bool   `json:"has_provided_key"`
 }
 
 type UserCourseResponseDTO struct {

@@ -34,6 +34,7 @@ func (h *UserHandler) RegisterRoutes(mux *http.ServeMux, authMw func(http.Handle
 	mux.Handle("/users/me", authMw(http.HandlerFunc(h.handleUsers)))
 	mux.Handle("/users/me/courses", authMw(http.HandlerFunc(h.getUserCourses)))
 	mux.Handle("/users/me/recents", authMw(http.HandlerFunc(h.getRecentLecturesWithCount)))
+	mux.Handle("/users/me/api-key", authMw(http.HandlerFunc(h.handleAPIKey)))
 }
 
 func (h *UserHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
@@ -98,12 +99,13 @@ func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
 
 	// 6. Map domain model to response DTO
 	resp := dto.UserResponseDTO{
-		UserID:    createdUser.UserID,
-		Name:      createdUser.Name,
-		Email:     createdUser.Email,
-		AvatarURL: createdUser.AvatarURL,
-		CreatedAt: createdUser.CreatedAt,
-		UpdatedAt: createdUser.UpdatedAt,
+		UserID:          createdUser.UserID,
+		Name:            createdUser.Name,
+		Email:           createdUser.Email,
+		AvatarURL:       createdUser.AvatarURL,
+		APIKeysProvided: createdUser.APIKeysProvided,
+		CreatedAt:       createdUser.CreatedAt,
+		UpdatedAt:       createdUser.UpdatedAt,
 	}
 
 	// 7. Return response
@@ -144,11 +146,13 @@ func (h *UserHandler) getUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := dto.UserResponseDTO{
-		UserID:    user.UserID,
-		Name:      user.Name,
-		Email:     user.Email,
-		AvatarURL: user.AvatarURL,
-		CreatedAt: user.CreatedAt,
+		UserID:          user.UserID,
+		Name:            user.Name,
+		Email:           user.Email,
+		AvatarURL:       user.AvatarURL,
+		APIKeysProvided: user.APIKeysProvided,
+		CreatedAt:       user.CreatedAt,
+		UpdatedAt:       user.UpdatedAt,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
@@ -279,6 +283,115 @@ func (h *UserHandler) getRecentLecturesWithCount(w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		// Error already handled by http.Error in other cases
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+// handleAPIKey handles API key operations (POST for storage, DELETE for removal)
+func (h *UserHandler) handleAPIKey(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		h.storeAPIKey(w, r)
+	case http.MethodDelete:
+		h.deleteAPIKey(w, r)
+	default:
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// storeAPIKey godoc
+// @Summary Store user's OpenAI API key
+// @Description Stores the user's OpenAI API key securely in Google Cloud Secret Manager and updates the user profile flag.
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param api_key body dto.APIKeyRequestDTO true "API key request"
+// @Success 200 {object} dto.APIKeyResponseDTO
+// @Failure 400 {string} string "Invalid JSON payload or validation failed"
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 500 {string} string "Failed to store API key"
+// @Router /users/me/api-key [post]
+func (h *UserHandler) storeAPIKey(w http.ResponseWriter, r *http.Request) {
+	userId, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userId == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	var req dto.APIKeyRequestDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.validate.Struct(&req); err != nil {
+		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err := h.userService.StoreAPIKey(r.Context(), userId, req.Provider, req.APIKey)
+	if err != nil {
+		h.logger.Error().Err(err).Str("user_id", userId).Str("provider", req.Provider).Msg("Failed to store API key")
+		http.Error(w, "Failed to store API key: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := dto.APIKeyResponseDTO{
+		Provider:       req.Provider,
+		HasProvidedKey: true,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+// deleteAPIKey godoc
+// @Summary Delete user's API key
+// @Description Deletes the user's API key from Google Cloud Secret Manager and updates the user profile flag.
+// @Tags users
+// @Produce json
+// @Param provider query string true "API provider (openai or gemini)"
+// @Success 200 {object} dto.APIKeyResponseDTO
+// @Failure 400 {string} string "Invalid provider parameter"
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 500 {string} string "Failed to delete API key"
+// @Router /users/me/api-key [delete]
+func (h *UserHandler) deleteAPIKey(w http.ResponseWriter, r *http.Request) {
+	userId, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userId == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	provider := r.URL.Query().Get("provider")
+	if provider == "" {
+		http.Error(w, "Provider parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	if provider != "openai" && provider != "gemini" {
+		http.Error(w, "Invalid provider. Must be 'openai' or 'gemini'", http.StatusBadRequest)
+		return
+	}
+
+	err := h.userService.DeleteAPIKey(r.Context(), userId, provider)
+	if err != nil {
+		h.logger.Error().Err(err).Str("user_id", userId).Str("provider", provider).Msg("Failed to delete API key")
+		http.Error(w, "Failed to delete API key: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := dto.APIKeyResponseDTO{
+		Provider:       provider,
+		HasProvidedKey: false,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }

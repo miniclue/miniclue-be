@@ -61,7 +61,60 @@ This project uses Docker Compose to run the Google Cloud Pub/Sub emulator.
 docker-compose up -d
 ```
 
-### 2. Set Up Pub/Sub Environment
+### 2. Set Up Google Cloud Secret Manager (Local Development)
+
+Secret Manager requires a real GCP project even for local development. You'll need to create a dedicated GCP project for local development.
+
+**Step 1: Create a GCP Project for Local Development**
+
+```bash
+# Create a new GCP project (or use an existing one)
+gcloud projects create miniclue-gcp-local-sr --name="MiniClue - Local SR"
+gcloud config set project miniclue-gcp-local-sr
+```
+
+**Step 2: Enable Secret Manager API**
+
+```bash
+gcloud services enable secretmanager.googleapis.com --project=miniclue-gcp-local-sr
+```
+
+**Step 3: Set Up Authentication**
+
+For local development, use Application Default Credentials (your personal account). This authenticates your local machine to access Secret Manager:
+
+```bash
+gcloud auth application-default login
+```
+
+**Important**: Grant your personal account the necessary permissions:
+
+```bash
+# Grant yourself Secret Manager Admin role for local development
+gcloud projects add-iam-policy-binding miniclue-gcp-local-sr \
+  --member="user:$(gcloud config get-value account)" \
+  --role="roles/secretmanager.admin"
+```
+
+**Step 4: Set Environment Variables**
+
+**Note**: Service accounts are only needed for production/staging environments where services run without user interaction. For local development, Application Default Credentials with your personal account is sufficient.
+
+Add to your `.env` file:
+
+```bash
+# GCP Project IDs
+GCP_PROJECT_ID_LOCAL=miniclue-gcp-local-sr
+GCP_PROJECT_ID_STAGING=miniclue-gcp-stg
+GCP_PROJECT_ID_PROD=miniclue-gcp-prod
+
+# Environment
+ENV=development
+```
+
+**Note**: For production/staging, the AI service (`miniclue-ai`) also needs access to Secret Manager. Ensure the Python service's service account has the `Secret Manager Secret Accessor` role in the same project. For local development, the AI service can also use Application Default Credentials.
+
+### 3. Set Up Pub/Sub Environment
 
 This step uses a Go program to configure Pub/Sub topics and subscriptions. It can target your local emulator, staging, or production.
 
@@ -86,7 +139,7 @@ make deploy-pubsub env=staging
 make deploy-pubsub env=production
 ```
 
-### 3. Run the API Server
+### 4. Run the API Server
 
 To build and run the main API server:
 
@@ -96,7 +149,7 @@ make run
 
 The API server will now be running and connected to the local Pub/Sub emulator.
 
-### 4. Update swagger documentation
+### 5. Update swagger documentation
 
 ```bash
 make swagger
@@ -104,7 +157,7 @@ make swagger
 
 This will generate the `swagger.json` file in the `docs` directory.
 
-### 5. Update local Supabase database
+### 6. Update local Supabase database
 
 - Make updates to the `supabase/schemas/schema.sql` file.
 - Run `supabase db diff -f [filename]` to generate a migration file.

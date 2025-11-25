@@ -49,3 +49,15 @@ func Load() (*Config, error) {
 	}
 	return &cfg, nil
 }
+
+// GetGCPProjectID returns the appropriate GCP project ID based on the environment.
+// Uses the same logic as Pub/Sub: local if emulator host is set, otherwise staging (preferred) or prod.
+func (c *Config) GetGCPProjectID() string {
+	if c.PubSubEmulatorHost != "" {
+		return c.GCPProjectIDLocal
+	}
+	if c.GCPProjectIDStaging != "" {
+		return c.GCPProjectIDStaging
+	}
+	return c.GCPProjectIDProd
+}

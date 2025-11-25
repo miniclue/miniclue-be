@@ -100,7 +100,14 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 		return nil, nil, err
 	}
 
-	// 6. Initialize repositories & services & handlers
+	// 6. Initialize Secret Manager service
+	secretManagerSvc, err := service.NewSecretManagerService(context.Background(), cfg)
+	if err != nil {
+		logger.Fatal().Msgf("Failed to create Secret Manager service: %v", err)
+		return nil, nil, err
+	}
+
+	// 7. Initialize repositories & services & handlers
 	userRepo := repository.NewUserRepo(pool)
 	lectureRepo := repository.NewLectureRepository(pool)
 	usageRepo := repository.NewUsageRepo(pool) // new usage events repo
@@ -110,7 +117,8 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	noteRepo := repository.NewNoteRepository(pool)
 	dlqRepo := repository.NewDLQRepository(pool)
 
-	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo, logger)
+	openAIValidator := service.NewOpenAIValidator()
+	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo, secretManagerSvc, openAIValidator, logger)
 	lectureSvc := service.NewLectureService(lectureRepo, userRepo, usageRepo, s3Client, cfg.S3Bucket, pubSubPublisher, cfg.PubSubIngestionTopic, logger)
 	courseSvc := service.NewCourseService(courseRepo, lectureSvc, logger)
 	summarySvc := service.NewSummaryService(summaryRepo, logger)
