@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -329,9 +330,22 @@ func (h *UserHandler) storeAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.userService.StoreAPIKey(r.Context(), userId, req.Provider, req.APIKey)
+	ctx := r.Context()
+	h.logger.Debug().
+		Str("user_id", userId).
+		Str("provider", req.Provider).
+		Bool("context_cancelled", ctx.Err() != nil).
+		Msg("Starting API key storage process")
+
+	err := h.userService.StoreAPIKey(ctx, userId, req.Provider, req.APIKey)
 	if err != nil {
-		h.logger.Error().Err(err).Str("user_id", userId).Str("provider", req.Provider).Msg("Failed to store API key")
+		h.logger.Error().
+			Err(err).
+			Str("user_id", userId).
+			Str("provider", req.Provider).
+			Bool("context_cancelled", ctx.Err() != nil).
+			Str("error_type", fmt.Sprintf("%T", err)).
+			Msg("Failed to store API key")
 		http.Error(w, "Failed to store API key: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

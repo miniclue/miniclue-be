@@ -67,9 +67,12 @@ func (r *userRepo) UpdateAPIKeyFlag(ctx context.Context, userID string, provider
 	// Use ARRAY[] constructor to pass the path as a proper text array
 	// jsonb_set expects a text[] array, not a string representation
 	query := `UPDATE user_profiles SET api_keys_provided = jsonb_set(COALESCE(api_keys_provided, '{}'::jsonb), ARRAY[$1], $2::jsonb, true), updated_at = NOW() WHERE user_id = $3`
-	_, err = r.pool.Exec(ctx, query, provider, valueJSON, userID)
+	result, err := r.pool.Exec(ctx, query, provider, valueJSON, userID)
 	if err != nil {
 		return fmt.Errorf("updating API key flag for user %s, provider %s: %w", userID, provider, err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("no rows affected: user %s may not exist in database", userID)
 	}
 	return nil
 }
