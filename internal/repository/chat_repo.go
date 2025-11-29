@@ -155,6 +155,9 @@ func (r *chatRepo) DeleteChat(ctx context.Context, chatID, userID string) error 
 }
 
 func (r *chatRepo) CreateMessage(ctx context.Context, chatID, role string, parts model.MessageParts) (*model.Message, error) {
+	if parts == nil {
+		parts = make(model.MessageParts, 0)
+	}
 	partsJSON, err := json.Marshal(parts)
 	if err != nil {
 		return nil, fmt.Errorf("marshaling message parts: %w", err)
