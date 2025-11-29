@@ -115,20 +115,24 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	summaryRepo := repository.NewSummaryRepository(pool)
 	explanationRepo := repository.NewExplanationRepository(pool)
 	noteRepo := repository.NewNoteRepository(pool)
+	chatRepo := repository.NewChatRepo(pool)
 	dlqRepo := repository.NewDLQRepository(pool)
 
 	openAIValidator := service.NewOpenAIValidator()
+	pythonClient := service.NewPythonClient(cfg.PythonServiceBaseURL, logger)
 	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo, secretManagerSvc, openAIValidator, logger)
 	lectureSvc := service.NewLectureService(lectureRepo, userRepo, usageRepo, s3Client, cfg.S3Bucket, pubSubPublisher, cfg.PubSubIngestionTopic, logger)
 	courseSvc := service.NewCourseService(courseRepo, lectureSvc, logger)
 	summarySvc := service.NewSummaryService(summaryRepo, logger)
 	explanationSvc := service.NewExplanationService(explanationRepo, logger)
 	noteSvc := service.NewNoteService(noteRepo, logger)
+	chatSvc := service.NewChatService(chatRepo, lectureRepo, pythonClient, logger)
 	dlqSvc := service.NewDLQService(dlqRepo, logger)
 
 	userHandler := handler.NewUserHandler(userSvc, validate, logger)
 	courseHandler := handler.NewCourseHandler(courseSvc, validate, logger)
-	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, summarySvc, explanationSvc, noteSvc, validate, cfg.S3URL, cfg.S3Bucket, logger)
+	chatHandler := handler.NewChatHandler(chatSvc, validate, logger)
+	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, summarySvc, explanationSvc, noteSvc, chatHandler, validate, cfg.S3URL, cfg.S3Bucket, logger)
 	dlqHandler := handler.NewDLQHandler(dlqSvc, logger)
 
 	// 7. Initialize middleware
@@ -144,6 +148,7 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	userHandler.RegisterRoutes(apiV1Mux, authMiddleware)
 	courseHandler.RegisterRoutes(apiV1Mux, authMiddleware)
 	lectureHandler.RegisterRoutes(apiV1Mux, authMiddleware)
+	chatHandler.RegisterRoutes(apiV1Mux, authMiddleware)
 	dlqHandler.RegisterRoutes(apiV1Mux, pubsubAuthMiddleware)
 
 	// Mount the API v1 routes under /v1

@@ -40,6 +40,9 @@ type Config struct {
 	// For staging/prod, these should be the base URL of your API gateway (e.g., https://api.miniclue.com)
 	APIBaseURLStaging string `envconfig:"API_BASE_URL_STAGING"`
 	APIBaseURLProd    string `envconfig:"API_BASE_URL_PROD"`
+
+	// Python Service
+	PythonServiceBaseURL string `envconfig:"PYTHON_SERVICE_BASE_URL" required:"true"`
 }
 
 func Load() (*Config, error) {

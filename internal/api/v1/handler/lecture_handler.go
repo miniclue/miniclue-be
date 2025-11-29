@@ -22,6 +22,7 @@ type LectureHandler struct {
 	summaryService     service.SummaryService
 	explanationService service.ExplanationService
 	noteService        service.NoteService
+	chatHandler        *ChatHandler
 	validate           *validator.Validate
 	s3BaseURL          string
 	s3Bucket           string
@@ -35,6 +36,7 @@ func NewLectureHandler(
 	summaryService service.SummaryService,
 	explanationService service.ExplanationService,
 	noteService service.NoteService,
+	chatHandler *ChatHandler,
 	validate *validator.Validate,
 	s3BaseURL string,
 	s3Bucket string,
@@ -46,6 +48,7 @@ func NewLectureHandler(
 		summaryService:     summaryService,
 		explanationService: explanationService,
 		noteService:        noteService,
+		chatHandler:        chatHandler,
 		validate:           validate,
 		s3BaseURL:          s3BaseURL,
 		s3Bucket:           s3Bucket,
@@ -64,6 +67,13 @@ func (h *LectureHandler) handleLecture(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(path, "/lectures/") {
 		http.NotFound(w, r)
 		return
+	}
+	// Delegate chat routes to ChatHandler
+	if strings.Contains(path, "/chats") {
+		if h.chatHandler != nil {
+			h.chatHandler.handleChatRoutes(w, r)
+			return
+		}
 	}
 	switch r.Method {
 	case http.MethodGet:

@@ -197,7 +197,35 @@ CREATE INDEX IF NOT EXISTS idx_notes_user_id    ON notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_lecture_id ON notes(lecture_id);
 
 -------------------------------------------------------------------------------
--- 11. Dead-Letter Queue Table
+-- 11. Chat Table
+-------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS chats (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  lecture_id UUID        NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
+  user_id    UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title      TEXT        NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_chats_lecture_id ON chats(lecture_id);
+CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats(user_id);
+CREATE INDEX IF NOT EXISTS idx_chats_lecture_user ON chats(lecture_id, user_id);
+
+-------------------------------------------------------------------------------
+-- 12. Message Table
+-------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS messages (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  chat_id    UUID        NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+  role       VARCHAR     NOT NULL CHECK (role IN ('user', 'assistant')),
+  parts      JSONB       NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
+
+-------------------------------------------------------------------------------
+-- 13. Dead-Letter Queue Table
 -------------------------------------------------------------------------------
 CREATE TYPE dlq_message_status AS ENUM (
   'unprocessed',
@@ -219,7 +247,7 @@ CREATE INDEX IF NOT EXISTS idx_dead_letter_messages_status ON dead_letter_messag
 CREATE INDEX IF NOT EXISTS idx_dead_letter_messages_created_at ON dead_letter_messages(created_at);
 
 -------------------------------------------------------------------------------
--- 12. LLM Calls Table
+-- 14. LLM Calls Table
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS llm_calls (
   id                 UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -238,7 +266,7 @@ CREATE TABLE IF NOT EXISTS llm_calls (
 CREATE INDEX IF NOT EXISTS idx_llm_calls_occurred_at ON llm_calls(occurred_at);
 
 -------------------------------------------------------------------------------
--- 13. Usage Events Table
+-- 15. Usage Events Table
 -------------------------------------------------------------------------------
 CREATE TYPE usage_event_type AS ENUM (
   'lecture_upload'
@@ -255,7 +283,7 @@ CREATE INDEX IF NOT EXISTS idx_usage_events_user_event_time
   ON usage_events(user_id, event_type, created_at);
 
 -------------------------------------------------------------------------------
--- 17. Waitlist Table
+-- 16. Waitlist Table
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS waitlist (
   id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -280,6 +308,8 @@ ALTER TABLE public.summaries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.explanations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.slide_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dead_letter_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.llm_calls ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.usage_events ENABLE ROW LEVEL SECURITY;
@@ -349,24 +379,64 @@ CREATE POLICY "Allow all access to own notes" ON public.notes
     EXISTS (SELECT 1 FROM lectures WHERE lectures.id = notes.lecture_id AND lectures.user_id = auth.uid())
   );
 
--- 11. dead_letter_messages: No access for regular users.
+-- 11. chats: Users can manage their own chats for lectures they own.
+CREATE POLICY "Allow all access to own chats" ON public.chats
+  FOR ALL
+  USING (
+    auth.uid() = user_id AND
+    EXISTS (SELECT 1 FROM lectures WHERE lectures.id = chats.lecture_id AND lectures.user_id = auth.uid())
+  )
+  WITH CHECK (
+    auth.uid() = user_id AND
+    EXISTS (SELECT 1 FROM lectures WHERE lectures.id = chats.lecture_id AND lectures.user_id = auth.uid())
+  );
+
+-- 12. messages: Users can manage messages for chats they own.
+CREATE POLICY "Allow all access to own messages" ON public.messages
+  FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM chats
+      WHERE chats.id = messages.chat_id
+        AND chats.user_id = auth.uid()
+        AND EXISTS (
+          SELECT 1 FROM lectures
+          WHERE lectures.id = chats.lecture_id
+            AND lectures.user_id = auth.uid()
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM chats
+      WHERE chats.id = messages.chat_id
+        AND chats.user_id = auth.uid()
+        AND EXISTS (
+          SELECT 1 FROM lectures
+          WHERE lectures.id = chats.lecture_id
+            AND lectures.user_id = auth.uid()
+        )
+    )
+  );
+
+-- 13. dead_letter_messages: No access for regular users.
 -- These are internal records for backend debugging, accessible only via service_role.
 CREATE POLICY "Deny all access to dead_letter_messages" ON public.dead_letter_messages
   FOR ALL
   USING (false)
   WITH CHECK (false);
 
--- 12. llm_calls: No access for regular users.
+-- 14. llm_calls: No access for regular users.
 CREATE POLICY "Deny all access to llm_calls" ON public.llm_calls
   FOR ALL
   USING (false)
   WITH CHECK (false);
 
--- 13. Usage Events Table
+-- 15. Usage Events Table
 CREATE POLICY "Deny all access to usage_events" ON public.usage_events
   FOR ALL USING (false) WITH CHECK (false);
 
--- 14. Waitlist Table
+-- 16. Waitlist Table
 CREATE POLICY "Allow anyone to insert into waitlist" ON public.waitlist
   FOR INSERT
   WITH CHECK (true);
