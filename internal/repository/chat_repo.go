@@ -16,9 +16,11 @@ type ChatRepository interface {
 	CreateChat(ctx context.Context, lectureID, userID, title string) (*model.Chat, error)
 	GetChat(ctx context.Context, chatID, userID string) (*model.Chat, error)
 	ListChats(ctx context.Context, lectureID, userID string, limit, offset int) ([]model.Chat, error)
+	UpdateChat(ctx context.Context, chatID, userID, title string) (*model.Chat, error)
 	DeleteChat(ctx context.Context, chatID, userID string) error
 	CreateMessage(ctx context.Context, chatID, role string, parts model.MessageParts) (*model.Message, error)
 	ListMessages(ctx context.Context, chatID, userID string, limit int) ([]model.Message, error)
+	GetMessageCount(ctx context.Context, chatID, userID string) (int, error)
 }
 
 type chatRepo struct {
@@ -110,6 +112,31 @@ func (r *chatRepo) ListChats(ctx context.Context, lectureID, userID string, limi
 	}
 
 	return chats, nil
+}
+
+func (r *chatRepo) UpdateChat(ctx context.Context, chatID, userID, title string) (*model.Chat, error) {
+	query := `
+		UPDATE chats
+		SET title = $1, updated_at = NOW()
+		WHERE id = $2 AND user_id = $3
+		RETURNING id, lecture_id, user_id, title, created_at, updated_at
+	`
+	var chat model.Chat
+	err := r.pool.QueryRow(ctx, query, title, chatID, userID).Scan(
+		&chat.ID,
+		&chat.LectureID,
+		&chat.UserID,
+		&chat.Title,
+		&chat.CreatedAt,
+		&chat.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("chat not found or access denied: %w", err)
+		}
+		return nil, fmt.Errorf("updating chat: %w", err)
+	}
+	return &chat, nil
 }
 
 func (r *chatRepo) DeleteChat(ctx context.Context, chatID, userID string) error {
@@ -204,4 +231,26 @@ func (r *chatRepo) ListMessages(ctx context.Context, chatID, userID string, limi
 	}
 
 	return messages, nil
+}
+
+func (r *chatRepo) GetMessageCount(ctx context.Context, chatID, userID string) (int, error) {
+	// Verify chat ownership first
+	chatQuery := `SELECT id FROM chats WHERE id = $1 AND user_id = $2`
+	var chatIDCheck string
+	err := r.pool.QueryRow(ctx, chatQuery, chatID, userID).Scan(&chatIDCheck)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, fmt.Errorf("chat not found or access denied: %w", err)
+		}
+		return 0, fmt.Errorf("verifying chat ownership: %w", err)
+	}
+
+	// Count messages for this chat
+	query := `SELECT COUNT(*) FROM messages WHERE chat_id = $1`
+	var count int
+	err = r.pool.QueryRow(ctx, query, chatID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("counting messages: %w", err)
+	}
+	return count, nil
 }

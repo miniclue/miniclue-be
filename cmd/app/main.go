@@ -63,7 +63,6 @@ func main() {
 
 	// 4. Start server in a goroutine
 	go func() {
-		logger.Info().Msgf("🚀 Server starting on port %s", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Fatal().Msgf("Listen: %s\n", err)
 		}
@@ -73,12 +72,10 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	logger.Info().Msg("Shutdown signal received, exiting...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Fatal().Msgf("Server forced to shutdown: %v", err)
 	}
-	logger.Info().Msg("Server shut down gracefully")
 }

@@ -126,12 +126,6 @@ func (s *userService) StoreAPIKey(ctx context.Context, userID, provider, apiKey 
 		return err
 	}
 
-	s.userLogger.Debug().
-		Str("user_id", userID).
-		Str("provider", provider).
-		Bool("context_cancelled", ctx.Err() != nil).
-		Msg("Successfully stored API key in Secret Manager, proceeding to update database flag")
-
 	// Update the flag in database
 	err = s.userRepo.UpdateAPIKeyFlag(ctx, userID, provider, true)
 	if err != nil {
@@ -144,11 +138,6 @@ func (s *userService) StoreAPIKey(ctx context.Context, userID, provider, apiKey 
 			Msg("Failed to update API key flag in database")
 		return err
 	}
-
-	s.userLogger.Debug().
-		Str("user_id", userID).
-		Str("provider", provider).
-		Msg("Successfully updated API key flag in database")
 
 	return nil
 }
@@ -164,12 +153,6 @@ func (s *userService) DeleteAPIKey(ctx context.Context, userID, provider string)
 		s.userLogger.Error().Err(err).Str("user_id", userID).Str("provider", provider).Msg("Failed to delete API key from Secret Manager")
 		return err
 	}
-
-	s.userLogger.Debug().
-		Str("user_id", userID).
-		Str("provider", provider).
-		Bool("context_cancelled", ctx.Err() != nil).
-		Msg("Successfully deleted API key from Secret Manager, proceeding to update database flag")
 
 	// Update the flag in database to false
 	err = s.userRepo.UpdateAPIKeyFlag(ctx, userID, provider, false)

@@ -331,12 +331,6 @@ func (h *UserHandler) storeAPIKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	h.logger.Debug().
-		Str("user_id", userId).
-		Str("provider", req.Provider).
-		Bool("context_cancelled", ctx.Err() != nil).
-		Msg("Starting API key storage process")
-
 	err := h.userService.StoreAPIKey(ctx, userId, req.Provider, req.APIKey)
 	if err != nil {
 		h.logger.Error().

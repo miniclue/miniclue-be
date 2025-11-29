@@ -6,6 +6,10 @@ type ChatCreateDTO struct {
 	Title *string `json:"title,omitempty"`
 }
 
+type ChatUpdateDTO struct {
+	Title *string `json:"title,omitempty" validate:"omitempty,min=1,max=200"`
+}
+
 type ChatResponseDTO struct {
 	ID        string    `json:"id"`
 	LectureID string    `json:"lecture_id"`

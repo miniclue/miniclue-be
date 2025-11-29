@@ -15,6 +15,7 @@ import (
 
 type PythonClient interface {
 	StreamChat(ctx context.Context, lectureID, chatID, userID string, messageParts []map[string]interface{}, model string) (io.ReadCloser, error)
+	GenerateChatTitle(ctx context.Context, lectureID, chatID, userID string, userMessageParts []map[string]interface{}, assistantMessageParts []map[string]interface{}) (string, error)
 }
 
 type pythonClient struct {
@@ -64,15 +65,6 @@ func (c *pythonClient) StreamChat(ctx context.Context, lectureID, chatID, userID
 
 	req.Header.Set("Content-Type", "application/json")
 
-	c.logger.Debug().
-		Str("url", url).
-		Str("lecture_id", lectureID).
-		Str("chat_id", chatID).
-		Str("user_id", userID).
-		Str("model", model).
-		Int("message_parts", len(messageParts)).
-		Msg("Sending chat request to Python service")
-
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("making request to Python service: %w", err)
@@ -98,6 +90,74 @@ func (c *pythonClient) StreamChat(ctx context.Context, lectureID, chatID, userID
 	}
 
 	return resp.Body, nil
+}
+
+type TitleRequest struct {
+	LectureID        string                   `json:"lecture_id"`
+	ChatID           string                   `json:"chat_id"`
+	UserID           string                   `json:"user_id"`
+	UserMessage      []map[string]interface{} `json:"user_message"`
+	AssistantMessage []map[string]interface{} `json:"assistant_message"`
+}
+
+type TitleResponse struct {
+	Title string `json:"title"`
+}
+
+func (c *pythonClient) GenerateChatTitle(ctx context.Context, lectureID, chatID, userID string, userMessageParts []map[string]interface{}, assistantMessageParts []map[string]interface{}) (string, error) {
+	reqBody := TitleRequest{
+		LectureID:        lectureID,
+		ChatID:           chatID,
+		UserID:           userID,
+		UserMessage:      userMessageParts,
+		AssistantMessage: assistantMessageParts,
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("marshaling request body: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/chat/generate-title", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("making request to Python service: %w", err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			c.logger.Warn().Err(closeErr).Msg("Failed to close response body")
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			c.logger.Warn().Err(readErr).Int("status_code", resp.StatusCode).Msg("Failed to read error body from Python service")
+			return "", fmt.Errorf("python service returned status %d", resp.StatusCode)
+		}
+
+		errorMsg := string(bodyBytes)
+		c.logger.Error().
+			Int("status_code", resp.StatusCode).
+			Str("error_body", errorMsg).
+			Msg("Python service returned error")
+
+		return "", fmt.Errorf("python service returned status %d: %s", resp.StatusCode, errorMsg)
+	}
+
+	var titleResp TitleResponse
+	if err := json.NewDecoder(resp.Body).Decode(&titleResp); err != nil {
+		return "", fmt.Errorf("decoding response: %w", err)
+	}
+
+	return titleResp.Title, nil
 }
 
 // ParseSSEChunk parses a single SSE chunk from the stream.

@@ -24,11 +24,6 @@ import (
 )
 
 func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool, error) {
-	logger.Info().Msg("Router initialized")
-
-	// Log environment variables for debugging
-	logger.Info().Str("environment", cfg.Environment).Msg("App environment loaded")
-	logger.Info().Str("db_connection_string_port_check", getPortFromDSN(cfg.DBConnectionString)).Msg("DB connection string port")
 
 	// 2. Open DB connection (connection pooling)
 	dsn := cfg.DBConnectionString
@@ -74,7 +69,6 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 		logger.Fatal().Err(err).Msg("Failed to ping DB")
 		return nil, nil, err
 	}
-	logger.Info().Msg("Database connection successful")
 
 	// 3. Initialize S3 client
 	s3Config, err := awsconfig.LoadDefaultConfig(context.TODO(),
@@ -186,24 +180,6 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	})
 
 	return middleware.LoggerMiddleware(c.Handler(mux)), pool, nil
-}
-
-// getPortFromDSN is a helper function to extract the port from a DSN string.
-// It is intended for debugging purposes.
-func getPortFromDSN(dsn string) string {
-	parts := strings.Split(dsn, ":")
-	for i, part := range parts {
-		if strings.Contains(part, "@") {
-			// This part contains user:pass@host, next part is port
-			if len(parts) > i+1 {
-				portAndDB := strings.Split(parts[i+1], "/")
-				if len(portAndDB) > 0 {
-					return portAndDB[0]
-				}
-			}
-		}
-	}
-	return "not_found"
 }
 
 // removeDisableGzip is a workaround for S3 signature errors with some S3-compatible services.

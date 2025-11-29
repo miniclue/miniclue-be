@@ -14,6 +14,6 @@ func LoggerMiddleware(next http.Handler) http.Handler {
 
 		logger := logger.New()
 		// Log original message format with full request URI including query params
-		logger.Info().Msgf("%s %s", r.Method, r.URL.RequestURI())
+		logger.Debug().Msgf("%s %s", r.Method, r.URL.RequestURI())
 	})
 }

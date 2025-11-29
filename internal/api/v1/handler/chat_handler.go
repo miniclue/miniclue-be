@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -66,6 +67,9 @@ func (h *ChatHandler) handleChatRoutes(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(remainingPath, "chats/") && strings.HasSuffix(remainingPath, "/messages") && r.Method == http.MethodGet:
 		chatID := strings.TrimSuffix(strings.TrimPrefix(remainingPath, "chats/"), "/messages")
 		h.listMessages(w, r, lectureID, chatID)
+	case strings.HasPrefix(remainingPath, "chats/") && r.Method == http.MethodPatch:
+		chatID := strings.TrimPrefix(remainingPath, "chats/")
+		h.updateChat(w, r, lectureID, chatID)
 	case strings.HasPrefix(remainingPath, "chats/") && r.Method == http.MethodGet:
 		chatID := strings.TrimPrefix(remainingPath, "chats/")
 		h.getChat(w, r, lectureID, chatID)
@@ -273,6 +277,70 @@ func (h *ChatHandler) deleteChat(w http.ResponseWriter, r *http.Request, lecture
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// updateChat godoc
+// @Summary Update a chat
+// @Description Updates a chat's title.
+// @Tags chats
+// @Accept json
+// @Produce json
+// @Param lectureId path string true "Lecture ID"
+// @Param chatId path string true "Chat ID"
+// @Param request body dto.ChatUpdateDTO false "Chat update request"
+// @Success 200 {object} dto.ChatResponseDTO
+// @Failure 400 {string} string "Invalid JSON payload or validation failed"
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "Chat not found"
+// @Failure 500 {string} string "Failed to update chat"
+// @Router /lectures/{lectureId}/chats/{chatId} [patch]
+func (h *ChatHandler) updateChat(w http.ResponseWriter, r *http.Request, lectureID, chatID string) {
+	_ = lectureID
+	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	var req dto.ChatUpdateDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.validate.Struct(&req); err != nil {
+		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.Title == nil || *req.Title == "" {
+		http.Error(w, "Title is required", http.StatusBadRequest)
+		return
+	}
+
+	chat, err := h.chatService.UpdateChat(r.Context(), chatID, userID, *req.Title)
+	if err != nil {
+		if err == service.ErrChatNotFound || err == service.ErrUnauthorized {
+			http.Error(w, "Chat not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to update chat: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := dto.ChatResponseDTO{
+		ID:        chat.ID,
+		LectureID: chat.LectureID,
+		UserID:    chat.UserID,
+		Title:     chat.Title,
+		CreatedAt: chat.CreatedAt,
+		UpdatedAt: chat.UpdatedAt,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to encode response")
+	}
+}
+
 // listMessages godoc
 // @Summary List messages in a chat
 // @Description Retrieves all messages for a specific chat. Messages are returned in chronological order (oldest first).
@@ -424,8 +492,6 @@ func (h *ChatHandler) streamChat(w http.ResponseWriter, r *http.Request, lecture
 	// Generate a unique text part ID for this stream
 	textPartID := fmt.Sprintf("part_%s_%d", chatID, time.Now().UnixNano())
 
-	h.logger.Info().Str("chat_id", chatID).Str("lecture_id", lectureID).Msg("Starting to read from Python service stream")
-
 	// Send text-start part (SDK will create the message internally)
 	textStartPart := map[string]interface{}{
 		"type": "text-start",
@@ -442,14 +508,11 @@ func (h *ChatHandler) streamChat(w http.ResponseWriter, r *http.Request, lecture
 		chunk, err := service.ParseSSEChunk(reader)
 		if err != nil {
 			if err == io.EOF {
-				h.logger.Info().Msg("Reached end of Python service stream")
 				break
 			}
 			h.logger.Error().Err(err).Msg("Error reading from Python service stream")
 			break
 		}
-
-		h.logger.Debug().Interface("chunk", chunk).Msg("Received chunk from Python service")
 
 		content, ok := chunk["content"].(string)
 		if !ok {
@@ -458,8 +521,6 @@ func (h *ChatHandler) streamChat(w http.ResponseWriter, r *http.Request, lecture
 		}
 
 		done, _ := chunk["done"].(bool)
-
-		h.logger.Debug().Str("content", content).Bool("done", done).Msg("Processing chunk")
 
 		// Send text-delta parts according to AI SDK protocol
 		if content != "" {
@@ -484,7 +545,6 @@ func (h *ChatHandler) streamChat(w http.ResponseWriter, r *http.Request, lecture
 		fullContent.WriteString(content)
 
 		if done {
-			h.logger.Info().Int("total_length", fullContent.Len()).Msg("Stream completed (done=true)")
 			break
 		}
 	}
@@ -522,15 +582,32 @@ func (h *ChatHandler) streamChat(w http.ResponseWriter, r *http.Request, lecture
 	// Save assistant message
 	if fullContent.Len() > 0 {
 		contentStr := fullContent.String()
-		h.logger.Info().Int("content_length", len(contentStr)).Str("chat_id", chatID).Msg("Saving assistant message to database")
 		assistantParts := model.MessageParts{
 			{Type: "text", Text: contentStr},
 		}
-		message, err := h.chatService.CreateMessage(r.Context(), chatID, userID, "assistant", assistantParts)
+		_, err := h.chatService.CreateMessage(r.Context(), chatID, userID, "assistant", assistantParts)
 		if err != nil {
 			h.logger.Error().Err(err).Str("chat_id", chatID).Msg("Failed to save assistant message")
 		} else {
-			h.logger.Info().Str("message_id", message.ID).Str("chat_id", chatID).Msg("Successfully saved assistant message")
+			// Check if this is the first conversation (user + assistant = 2 messages) and trigger title generation
+			messageCount, err := h.chatService.GetMessageCount(r.Context(), chatID, userID)
+			if err == nil && messageCount == 2 {
+				// This is the first conversation - generate title from both messages
+				// Title generation happens asynchronously, frontend will poll for updates
+				// Use background context with timeout instead of request context (which gets canceled)
+				titleCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				go func() {
+					defer cancel()
+					h.chatService.GenerateAndUpdateTitle(
+						titleCtx,
+						lectureID,
+						chatID,
+						userID,
+						messageParts,   // User message
+						assistantParts, // Assistant response
+					)
+				}()
+			}
 		}
 	} else {
 		h.logger.Warn().Str("chat_id", chatID).Msg("No content to save for assistant message")
