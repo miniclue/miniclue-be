@@ -18,7 +18,7 @@ type ChatRepository interface {
 	ListChats(ctx context.Context, lectureID, userID string, limit, offset int) ([]model.Chat, error)
 	DeleteChat(ctx context.Context, chatID, userID string) error
 	CreateMessage(ctx context.Context, chatID, role string, parts model.MessageParts) (*model.Message, error)
-	ListMessages(ctx context.Context, chatID, userID string, limit, offset int) ([]model.Message, error)
+	ListMessages(ctx context.Context, chatID, userID string, limit int) ([]model.Message, error)
 }
 
 type chatRepo struct {
@@ -152,7 +152,7 @@ func (r *chatRepo) CreateMessage(ctx context.Context, chatID, role string, parts
 	return &message, nil
 }
 
-func (r *chatRepo) ListMessages(ctx context.Context, chatID, userID string, limit, offset int) ([]model.Message, error) {
+func (r *chatRepo) ListMessages(ctx context.Context, chatID, userID string, limit int) ([]model.Message, error) {
 	// Verify chat ownership first
 	chatQuery := `SELECT id FROM chats WHERE id = $1 AND user_id = $2`
 	var chatIDCheck string
@@ -164,13 +164,14 @@ func (r *chatRepo) ListMessages(ctx context.Context, chatID, userID string, limi
 		return nil, fmt.Errorf("verifying chat ownership: %w", err)
 	}
 
+	// Fetch the latest messages (ordered DESC, then reverse to get oldest first)
 	query := fmt.Sprintf(`
 		SELECT id, chat_id, role, parts, created_at
 		FROM messages
 		WHERE chat_id = $1
-		ORDER BY created_at ASC
-		LIMIT %d OFFSET %d
-	`, limit, offset)
+		ORDER BY created_at DESC
+		LIMIT %d
+	`, limit)
 
 	rows, err := r.pool.Query(ctx, query, chatID)
 	if err != nil {
@@ -195,6 +196,11 @@ func (r *chatRepo) ListMessages(ctx context.Context, chatID, userID string, limi
 
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating message rows: %w", err)
+	}
+
+	// Reverse the messages to get chronological order (oldest first)
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
 	}
 
 	return messages, nil

@@ -24,7 +24,7 @@ type ChatService interface {
 	ListChats(ctx context.Context, lectureID, userID string, limit, offset int) ([]model.Chat, error)
 	DeleteChat(ctx context.Context, chatID, userID string) error
 	CreateMessage(ctx context.Context, chatID, userID, role string, parts model.MessageParts) (*model.Message, error)
-	ListMessages(ctx context.Context, chatID, userID string, limit, offset int) ([]model.Message, error)
+	ListMessages(ctx context.Context, chatID, userID string, limit int) ([]model.Message, error)
 	StreamChatResponse(ctx context.Context, lectureID, chatID, userID string, messageParts model.MessageParts, model string) (io.ReadCloser, error)
 }
 
@@ -148,7 +148,7 @@ func (s *chatService) CreateMessage(ctx context.Context, chatID, userID, role st
 	return message, nil
 }
 
-func (s *chatService) ListMessages(ctx context.Context, chatID, userID string, limit, offset int) ([]model.Message, error) {
+func (s *chatService) ListMessages(ctx context.Context, chatID, userID string, limit int) ([]model.Message, error) {
 	// Verify chat ownership
 	chat, err := s.chatRepo.GetChat(ctx, chatID, userID)
 	if err != nil {
@@ -164,7 +164,7 @@ func (s *chatService) ListMessages(ctx context.Context, chatID, userID string, l
 		return nil, ErrUnauthorized
 	}
 
-	messages, err := s.chatRepo.ListMessages(ctx, chatID, userID, limit, offset)
+	messages, err := s.chatRepo.ListMessages(ctx, chatID, userID, limit)
 	if err != nil {
 		s.logger.Error().Err(err).Str("chat_id", chatID).Msg("Failed to list messages")
 		return nil, fmt.Errorf("listing messages: %w", err)

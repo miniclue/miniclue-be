@@ -275,13 +275,12 @@ func (h *ChatHandler) deleteChat(w http.ResponseWriter, r *http.Request, lecture
 
 // listMessages godoc
 // @Summary List messages in a chat
-// @Description Retrieves all messages for a specific chat with pagination support. Messages are returned in chronological order (oldest first).
+// @Description Retrieves all messages for a specific chat. Messages are returned in chronological order (oldest first).
 // @Tags chats
 // @Produce json
 // @Param lectureId path string true "Lecture ID"
 // @Param chatId path string true "Chat ID"
 // @Param limit query int false "Maximum number of messages to return" default(100)
-// @Param offset query int false "Number of messages to skip" default(0)
 // @Success 200 {array} dto.MessageResponseDTO
 // @Failure 401 {string} string "Unauthorized: User ID not found in context"
 // @Failure 404 {string} string "Chat not found"
@@ -296,19 +295,13 @@ func (h *ChatHandler) listMessages(w http.ResponseWriter, r *http.Request, lectu
 	}
 
 	limit := 100
-	offset := 0
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
 			limit = parsedLimit
 		}
 	}
-	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
-			offset = parsedOffset
-		}
-	}
 
-	messages, err := h.chatService.ListMessages(r.Context(), chatID, userID, limit, offset)
+	messages, err := h.chatService.ListMessages(r.Context(), chatID, userID, limit)
 	if err != nil {
 		if err == service.ErrChatNotFound || err == service.ErrUnauthorized {
 			http.Error(w, "Chat not found", http.StatusNotFound)

@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/rs/zerolog"
 )
@@ -27,8 +26,9 @@ type pythonClient struct {
 func NewPythonClient(baseURL string, logger zerolog.Logger) PythonClient {
 	return &pythonClient{
 		baseURL: baseURL,
-		client: &http.Client{
-			Timeout: 5 * time.Minute, // Long timeout for streaming
+		client:  &http.Client{
+			// No timeout for streaming - rely on context cancellation instead
+			// This allows long-running streaming responses without premature cancellation
 		},
 		logger: logger.With().Str("service", "PythonClient").Logger(),
 	}
@@ -64,45 +64,100 @@ func (c *pythonClient) StreamChat(ctx context.Context, lectureID, chatID, userID
 
 	req.Header.Set("Content-Type", "application/json")
 
+	c.logger.Debug().
+		Str("url", url).
+		Str("lecture_id", lectureID).
+		Str("chat_id", chatID).
+		Str("user_id", userID).
+		Str("model", model).
+		Int("message_parts", len(messageParts)).
+		Msg("Sending chat request to Python service")
+
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("making request to Python service: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		// Read error body for better error messages
+		bodyBytes, readErr := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
-		return nil, fmt.Errorf("python service returned status %d", resp.StatusCode)
+
+		if readErr != nil {
+			c.logger.Warn().Err(readErr).Int("status_code", resp.StatusCode).Msg("Failed to read error body from Python service")
+			return nil, fmt.Errorf("python service returned status %d", resp.StatusCode)
+		}
+
+		errorMsg := string(bodyBytes)
+		c.logger.Error().
+			Int("status_code", resp.StatusCode).
+			Str("error_body", errorMsg).
+			Msg("Python service returned error")
+
+		return nil, fmt.Errorf("python service returned status %d: %s", resp.StatusCode, errorMsg)
 	}
 
 	return resp.Body, nil
 }
 
-// ParseSSEChunk parses a single SSE chunk from the stream
+// ParseSSEChunk parses a single SSE chunk from the stream.
+// SSE format: "data: <json>\n\n" where blank line separates events.
+// Handles comments (lines starting with ":") and empty lines.
 func ParseSSEChunk(reader *bufio.Reader) (map[string]interface{}, error) {
 	var dataLine string
+	foundData := false
+
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
+				if foundData {
+					// We found data but hit EOF before blank line - this is valid
+					break
+				}
 				return nil, io.EOF
 			}
 			return nil, err
 		}
 
-		line = strings.TrimSpace(line)
+		line = strings.TrimRight(line, "\r\n")
+
+		// Empty line indicates end of SSE event
 		if len(line) == 0 {
+			if foundData {
+				break
+			}
+			// Skip blank lines before data
 			continue
 		}
 
+		// Skip comments (SSE spec allows comments starting with ":")
+		if strings.HasPrefix(line, ":") {
+			continue
+		}
+
+		// Parse data line
 		if strings.HasPrefix(line, "data: ") {
 			dataLine = line[6:] // Remove "data: " prefix
+			foundData = true
+			// Continue reading until we hit blank line or EOF
+			continue
+		}
+
+		// If we already found data and hit a non-empty, non-comment line,
+		// this might be malformed SSE, but we'll try to parse what we have
+		if foundData {
 			break
 		}
 	}
 
+	if !foundData {
+		return nil, fmt.Errorf("no data line found in SSE chunk")
+	}
+
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(dataLine), &result); err != nil {
-		return nil, fmt.Errorf("unmarshaling SSE data: %w", err)
+		return nil, fmt.Errorf("unmarshaling SSE data %q: %w", dataLine, err)
 	}
 
 	return result, nil

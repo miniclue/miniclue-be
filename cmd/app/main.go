@@ -51,11 +51,13 @@ func main() {
 	}
 
 	// 3. Create HTTP server
+	// WriteTimeout is set to 5 minutes to accommodate long-running streaming responses
+	// (e.g., AI chat streaming which involves query rewriting, RAG retrieval, and LLM streaming)
 	srv := &http.Server{
 		Addr:         ":" + port,
 		Handler:      r,
 		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		WriteTimeout: 5 * time.Minute,
 		IdleTimeout:  60 * time.Second,
 	}
 
