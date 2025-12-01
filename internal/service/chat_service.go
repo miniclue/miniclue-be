@@ -24,7 +24,7 @@ type ChatService interface {
 	ListChats(ctx context.Context, lectureID, userID string, limit, offset int) ([]model.Chat, error)
 	UpdateChat(ctx context.Context, chatID, userID, title string) (*model.Chat, error)
 	DeleteChat(ctx context.Context, chatID, userID string) error
-	CreateMessage(ctx context.Context, chatID, userID, role string, parts model.MessageParts) (*model.Message, error)
+	CreateMessage(ctx context.Context, chatID, userID, role string, parts model.MessageParts, metadata map[string]interface{}) (*model.Message, error)
 	ListMessages(ctx context.Context, chatID, userID string, limit int) ([]model.Message, error)
 	GetMessageCount(ctx context.Context, chatID, userID string) (int, error)
 	StreamChatResponse(ctx context.Context, lectureID, chatID, userID string, messageParts model.MessageParts, model string) (io.ReadCloser, error)
@@ -151,7 +151,7 @@ func (s *chatService) DeleteChat(ctx context.Context, chatID, userID string) err
 	return nil
 }
 
-func (s *chatService) CreateMessage(ctx context.Context, chatID, userID, role string, parts model.MessageParts) (*model.Message, error) {
+func (s *chatService) CreateMessage(ctx context.Context, chatID, userID, role string, parts model.MessageParts, metadata map[string]interface{}) (*model.Message, error) {
 	// Verify chat ownership
 	chat, err := s.chatRepo.GetChat(ctx, chatID, userID)
 	if err != nil {
@@ -167,7 +167,7 @@ func (s *chatService) CreateMessage(ctx context.Context, chatID, userID, role st
 		return nil, ErrUnauthorized
 	}
 
-	message, err := s.chatRepo.CreateMessage(ctx, chatID, role, parts)
+	message, err := s.chatRepo.CreateMessage(ctx, chatID, role, parts, metadata)
 	if err != nil {
 		s.logger.Error().Err(err).Str("chat_id", chatID).Msg("Failed to create message")
 		return nil, fmt.Errorf("creating message: %w", err)

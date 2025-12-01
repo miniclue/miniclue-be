@@ -18,7 +18,7 @@ type ChatRepository interface {
 	ListChats(ctx context.Context, lectureID, userID string, limit, offset int) ([]model.Chat, error)
 	UpdateChat(ctx context.Context, chatID, userID, title string) (*model.Chat, error)
 	DeleteChat(ctx context.Context, chatID, userID string) error
-	CreateMessage(ctx context.Context, chatID, role string, parts model.MessageParts) (*model.Message, error)
+	CreateMessage(ctx context.Context, chatID, role string, parts model.MessageParts, metadata map[string]interface{}) (*model.Message, error)
 	ListMessages(ctx context.Context, chatID, userID string, limit int) ([]model.Message, error)
 	GetMessageCount(ctx context.Context, chatID, userID string) (int, error)
 }
@@ -154,7 +154,7 @@ func (r *chatRepo) DeleteChat(ctx context.Context, chatID, userID string) error 
 	return nil
 }
 
-func (r *chatRepo) CreateMessage(ctx context.Context, chatID, role string, parts model.MessageParts) (*model.Message, error) {
+func (r *chatRepo) CreateMessage(ctx context.Context, chatID, role string, parts model.MessageParts, metadata map[string]interface{}) (*model.Message, error) {
 	if parts == nil {
 		parts = make(model.MessageParts, 0)
 	}
@@ -163,13 +163,21 @@ func (r *chatRepo) CreateMessage(ctx context.Context, chatID, role string, parts
 		return nil, fmt.Errorf("marshaling message parts: %w", err)
 	}
 
+	if metadata == nil {
+		metadata = make(map[string]interface{})
+	}
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling message metadata: %w", err)
+	}
+
 	query := `
-		INSERT INTO messages (chat_id, role, parts)
-		VALUES ($1, $2, $3)
+		INSERT INTO messages (chat_id, role, parts, metadata)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id, chat_id, role, parts, created_at
 	`
 	var message model.Message
-	err = r.pool.QueryRow(ctx, query, chatID, role, string(partsJSON)).Scan(
+	err = r.pool.QueryRow(ctx, query, chatID, role, string(partsJSON), string(metadataJSON)).Scan(
 		&message.ID,
 		&message.ChatID,
 		&message.Role,

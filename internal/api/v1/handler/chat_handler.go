@@ -446,7 +446,10 @@ func (h *ChatHandler) streamChat(w http.ResponseWriter, r *http.Request, lecture
 	}
 
 	// Save user message first
-	userMessage, err := h.chatService.CreateMessage(r.Context(), chatID, userID, "user", messageParts)
+	userMetadata := map[string]interface{}{
+		"model": req.Model,
+	}
+	userMessage, err := h.chatService.CreateMessage(r.Context(), chatID, userID, "user", messageParts, userMetadata)
 	if err != nil {
 		if err == service.ErrChatNotFound || err == service.ErrUnauthorized {
 			http.Error(w, "Chat not found", http.StatusNotFound)
@@ -585,7 +588,10 @@ func (h *ChatHandler) streamChat(w http.ResponseWriter, r *http.Request, lecture
 		assistantParts := model.MessageParts{
 			{Type: "text", Text: contentStr},
 		}
-		_, err := h.chatService.CreateMessage(r.Context(), chatID, userID, "assistant", assistantParts)
+		assistantMetadata := map[string]interface{}{
+			"model": req.Model,
+		}
+		_, err := h.chatService.CreateMessage(r.Context(), chatID, userID, "assistant", assistantParts, assistantMetadata)
 		if err != nil {
 			h.logger.Error().Err(err).Str("chat_id", chatID).Msg("Failed to save assistant message")
 		} else {
