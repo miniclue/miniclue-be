@@ -246,26 +246,7 @@ CREATE INDEX IF NOT EXISTS idx_dead_letter_messages_status ON dead_letter_messag
 CREATE INDEX IF NOT EXISTS idx_dead_letter_messages_created_at ON dead_letter_messages(created_at);
 
 -------------------------------------------------------------------------------
--- 14. LLM Calls Table
--------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS llm_calls (
-  id                 UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
-  lecture_id         UUID           REFERENCES lectures(id) ON DELETE SET NULL,
-  slide_id           UUID           REFERENCES slides(id) ON DELETE SET NULL,
-  call_type          TEXT           NOT NULL CHECK (call_type IN ('ingestion','explanation','embedding','summary','image_analysis','other')),
-  model              TEXT           NOT NULL,
-  prompt_tokens      INT            NOT NULL,
-  completion_tokens  INT            NOT NULL,
-  total_tokens       INT            NOT NULL,
-  currency           TEXT           NOT NULL DEFAULT 'USD',
-  cost               NUMERIC(10,6)  NOT NULL,
-  occurred_at        TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
-  metadata           JSONB          NOT NULL DEFAULT '{}'::JSONB
-);
-CREATE INDEX IF NOT EXISTS idx_llm_calls_occurred_at ON llm_calls(occurred_at);
-
--------------------------------------------------------------------------------
--- 15. Waitlist Table
+-- 14. Waitlist Table
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS waitlist (
   id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -276,7 +257,7 @@ CREATE TABLE IF NOT EXISTS waitlist (
 CREATE INDEX IF NOT EXISTS idx_waitlist_email ON waitlist(email);
 
 -------------------------------------------------------------------------------
--- 16. Row-Level Security (RLS) Policies
+-- 15. Row-Level Security (RLS) Policies
 -------------------------------------------------------------------------------
 
 -- Enable RLS for all relevant tables
@@ -293,7 +274,6 @@ ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dead_letter_messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.llm_calls ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.waitlist ENABLE ROW LEVEL SECURITY;
 
 -- 1. courses: Users can manage their own courses fully.
@@ -407,13 +387,7 @@ CREATE POLICY "Deny all access to dead_letter_messages" ON public.dead_letter_me
   USING (false)
   WITH CHECK (false);
 
--- 14. llm_calls: No access for regular users.
-CREATE POLICY "Deny all access to llm_calls" ON public.llm_calls
-  FOR ALL
-  USING (false)
-  WITH CHECK (false);
-
--- 15. Waitlist Table
+-- 14. Waitlist Table
 CREATE POLICY "Allow anyone to insert into waitlist" ON public.waitlist
   FOR INSERT
   WITH CHECK (true);
