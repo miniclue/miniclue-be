@@ -151,7 +151,6 @@ CREATE TABLE IF NOT EXISTS explanations (
   lecture_id   UUID        NOT NULL,
   slide_number INT         NOT NULL,
   content      TEXT        NOT NULL,
-  one_liner    TEXT        NOT NULL DEFAULT '',
   slide_type   TEXT,
   metadata     JSONB       NOT NULL DEFAULT '{}'::JSONB,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -266,24 +265,7 @@ CREATE TABLE IF NOT EXISTS llm_calls (
 CREATE INDEX IF NOT EXISTS idx_llm_calls_occurred_at ON llm_calls(occurred_at);
 
 -------------------------------------------------------------------------------
--- 15. Usage Events Table
--------------------------------------------------------------------------------
-CREATE TYPE usage_event_type AS ENUM (
-  'lecture_upload'
-);
-
-CREATE TABLE IF NOT EXISTS usage_events (
-  id           UUID              PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id      UUID              NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  event_type   usage_event_type  NOT NULL,
-  lecture_id   UUID              REFERENCES lectures(id) ON DELETE SET NULL,
-  created_at   TIMESTAMPTZ       NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_usage_events_user_event_time 
-  ON usage_events(user_id, event_type, created_at);
-
--------------------------------------------------------------------------------
--- 16. Waitlist Table
+-- 15. Waitlist Table
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS waitlist (
   id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -294,7 +276,7 @@ CREATE TABLE IF NOT EXISTS waitlist (
 CREATE INDEX IF NOT EXISTS idx_waitlist_email ON waitlist(email);
 
 -------------------------------------------------------------------------------
--- 18. Row-Level Security (RLS) Policies
+-- 16. Row-Level Security (RLS) Policies
 -------------------------------------------------------------------------------
 
 -- Enable RLS for all relevant tables
@@ -312,7 +294,6 @@ ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dead_letter_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.llm_calls ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.usage_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.waitlist ENABLE ROW LEVEL SECURITY;
 
 -- 1. courses: Users can manage their own courses fully.
@@ -432,11 +413,7 @@ CREATE POLICY "Deny all access to llm_calls" ON public.llm_calls
   USING (false)
   WITH CHECK (false);
 
--- 15. Usage Events Table
-CREATE POLICY "Deny all access to usage_events" ON public.usage_events
-  FOR ALL USING (false) WITH CHECK (false);
-
--- 16. Waitlist Table
+-- 15. Waitlist Table
 CREATE POLICY "Allow anyone to insert into waitlist" ON public.waitlist
   FOR INSERT
   WITH CHECK (true);

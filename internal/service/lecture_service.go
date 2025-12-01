@@ -26,10 +26,6 @@ type LectureService interface {
 
 	GetPresignedURL(ctx context.Context, storagePath string) (string, error)
 
-	// RecordUploadEvent records a new upload event without checking quota limits.
-	RecordUploadEvent(ctx context.Context, userID string, lectureID string) error
-	// CountLecturesByUserInTimeRange counts lecture uploads in the given period.
-	CountLecturesByUserInTimeRange(ctx context.Context, userID string, start, end time.Time) (int, error)
 	InitiateUpload(ctx context.Context, courseID, userID, filename string) (*model.Lecture, string, error)
 	InitiateBatchUpload(ctx context.Context, courseID, userID string, filenames []string) ([]*model.Lecture, []string, error)
 	CompleteUpload(ctx context.Context, lectureID, userID string) (*model.Lecture, error)
@@ -39,7 +35,6 @@ type LectureService interface {
 type lectureService struct {
 	repo           repository.LectureRepository
 	userRepo       repository.UserRepository
-	usageRepo      repository.UsageRepository
 	s3Client       *s3.Client
 	presignClient  *s3.PresignClient
 	bucketName     string
@@ -52,7 +47,6 @@ type lectureService struct {
 func NewLectureService(
 	repo repository.LectureRepository,
 	userRepo repository.UserRepository,
-	usageRepo repository.UsageRepository,
 	s3Client *s3.Client,
 	bucketName string,
 	publisher pubsub.Publisher,
@@ -62,7 +56,6 @@ func NewLectureService(
 	return &lectureService{
 		repo:           repo,
 		userRepo:       userRepo,
-		usageRepo:      usageRepo,
 		s3Client:       s3Client,
 		presignClient:  s3.NewPresignClient(s3Client),
 		bucketName:     bucketName,
@@ -310,14 +303,4 @@ func (s *lectureService) getPresignedPutURL(ctx context.Context, objectKey strin
 		return "", fmt.Errorf("failed to generate presigned PUT URL: %w", err)
 	}
 	return request.URL, nil
-}
-
-// CountLecturesByUserInTimeRange delegates to repository
-func (s *lectureService) CountLecturesByUserInTimeRange(ctx context.Context, userID string, start, end time.Time) (int, error) {
-	return s.usageRepo.CountUploadEventsInTimeRange(ctx, userID, start, end)
-}
-
-// RecordUploadEvent delegates to repository
-func (s *lectureService) RecordUploadEvent(ctx context.Context, userID string, lectureID string) error {
-	return s.usageRepo.RecordUploadEvent(ctx, userID, lectureID)
 }

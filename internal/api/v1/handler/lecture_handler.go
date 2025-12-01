@@ -733,19 +733,6 @@ func (h *LectureHandler) getBatchUploadURL(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Record upload events for all files
-	for i := 0; i < len(req.Filenames); i++ {
-		err := h.lectureService.RecordUploadEvent(r.Context(), userID, lectures[i].ID)
-		if err != nil {
-			// If recording fails, clean up created lectures
-			for _, lecture := range lectures {
-				_ = h.lectureService.DeleteLecture(r.Context(), lecture.ID)
-			}
-			http.Error(w, "Failed to record upload events: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-
 	// Build response
 	var uploads []dto.LectureUploadURLResponseDTO
 	for i, lecture := range lectures {
