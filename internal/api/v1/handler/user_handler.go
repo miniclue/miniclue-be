@@ -301,12 +301,12 @@ func (h *UserHandler) handleAPIKey(w http.ResponseWriter, r *http.Request) {
 }
 
 // storeAPIKey godoc
-// @Summary Store user's OpenAI API key
-// @Description Stores the user's OpenAI API key securely in Google Cloud Secret Manager and updates the user profile flag.
+// @Summary Store user's API key
+// @Description Stores the user's API key securely in Google Cloud Secret Manager and updates the user profile flag. Supports providers: openai, gemini, anthropic, xai, and deepseek.
 // @Tags users
 // @Accept json
 // @Produce json
-// @Param api_key body dto.APIKeyRequestDTO true "API key request"
+// @Param api_key body dto.APIKeyRequestDTO true "API key request with provider (openai, gemini, anthropic, xai, or deepseek)"
 // @Success 200 {object} dto.APIKeyResponseDTO
 // @Failure 400 {string} string "Invalid JSON payload or validation failed"
 // @Failure 401 {string} string "Unauthorized: User ID not found in context"
@@ -361,7 +361,7 @@ func (h *UserHandler) storeAPIKey(w http.ResponseWriter, r *http.Request) {
 // @Description Deletes the user's API key from Google Cloud Secret Manager and updates the user profile flag.
 // @Tags users
 // @Produce json
-// @Param provider query string true "API provider (openai or gemini)"
+// @Param provider query string true "API provider (openai, gemini, anthropic, xai, or deepseek)"
 // @Success 200 {object} dto.APIKeyResponseDTO
 // @Failure 400 {string} string "Invalid provider parameter"
 // @Failure 401 {string} string "Unauthorized: User ID not found in context"
@@ -380,8 +380,15 @@ func (h *UserHandler) deleteAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if provider != "openai" && provider != "gemini" {
-		http.Error(w, "Invalid provider. Must be 'openai' or 'gemini'", http.StatusBadRequest)
+	validProviders := map[string]bool{
+		"openai":    true,
+		"gemini":    true,
+		"anthropic": true,
+		"xai":       true,
+		"deepseek":  true,
+	}
+	if !validProviders[provider] {
+		http.Error(w, "Invalid provider. Must be one of: openai, gemini, anthropic, xai, or deepseek", http.StatusBadRequest)
 		return
 	}
 

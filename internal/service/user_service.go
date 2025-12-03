@@ -26,22 +26,30 @@ type UserService interface {
 }
 
 type userService struct {
-	userRepo         repository.UserRepository
-	courseRepo       repository.CourseRepository
-	lectureRepo      repository.LectureRepository
-	secretManagerSvc SecretManagerService
-	openAIValidator  OpenAIValidator
-	userLogger       zerolog.Logger
+	userRepo           repository.UserRepository
+	courseRepo         repository.CourseRepository
+	lectureRepo        repository.LectureRepository
+	secretManagerSvc   SecretManagerService
+	openAIValidator    OpenAIValidator
+	geminiValidator    GeminiValidator
+	anthropicValidator AnthropicValidator
+	xaiValidator       XAIValidator
+	deepseekValidator  DeepSeekValidator
+	userLogger         zerolog.Logger
 }
 
-func NewUserService(userRepo repository.UserRepository, courseRepo repository.CourseRepository, lectureRepo repository.LectureRepository, secretManagerSvc SecretManagerService, openAIValidator OpenAIValidator, logger zerolog.Logger) UserService {
+func NewUserService(userRepo repository.UserRepository, courseRepo repository.CourseRepository, lectureRepo repository.LectureRepository, secretManagerSvc SecretManagerService, openAIValidator OpenAIValidator, geminiValidator GeminiValidator, anthropicValidator AnthropicValidator, xaiValidator XAIValidator, deepseekValidator DeepSeekValidator, logger zerolog.Logger) UserService {
 	return &userService{
-		userRepo:         userRepo,
-		courseRepo:       courseRepo,
-		lectureRepo:      lectureRepo,
-		secretManagerSvc: secretManagerSvc,
-		openAIValidator:  openAIValidator,
-		userLogger:       logger.With().Str("service", "UserService").Logger(),
+		userRepo:           userRepo,
+		courseRepo:         courseRepo,
+		lectureRepo:        lectureRepo,
+		secretManagerSvc:   secretManagerSvc,
+		openAIValidator:    openAIValidator,
+		geminiValidator:    geminiValidator,
+		anthropicValidator: anthropicValidator,
+		xaiValidator:       xaiValidator,
+		deepseekValidator:  deepseekValidator,
+		userLogger:         logger.With().Str("service", "UserService").Logger(),
 	}
 }
 
@@ -110,13 +118,26 @@ func (s *userService) StoreAPIKey(ctx context.Context, userID, provider, apiKey 
 		return errors.New("provider cannot be empty")
 	}
 
-	// Validate API key before storing (currently only OpenAI is supported)
-	if provider == "openai" {
-		err := s.openAIValidator.ValidateAPIKey(ctx, apiKey)
-		if err != nil {
-			s.userLogger.Error().Err(err).Str("user_id", userID).Str("provider", provider).Msg("API key validation failed")
-			return fmt.Errorf("invalid API key: %w", err)
-		}
+	// Validate API key before storing based on provider
+	var validationErr error
+	switch provider {
+	case "openai":
+		validationErr = s.openAIValidator.ValidateAPIKey(ctx, apiKey)
+	case "gemini":
+		validationErr = s.geminiValidator.ValidateAPIKey(ctx, apiKey)
+	case "anthropic":
+		validationErr = s.anthropicValidator.ValidateAPIKey(ctx, apiKey)
+	case "xai":
+		validationErr = s.xaiValidator.ValidateAPIKey(ctx, apiKey)
+	case "deepseek":
+		validationErr = s.deepseekValidator.ValidateAPIKey(ctx, apiKey)
+	default:
+		return fmt.Errorf("unsupported provider: %s", provider)
+	}
+
+	if validationErr != nil {
+		s.userLogger.Error().Err(validationErr).Str("user_id", userID).Str("provider", provider).Msg("API key validation failed")
+		return fmt.Errorf("invalid API key: %w", validationErr)
 	}
 
 	// Store in Secret Manager with provider-specific naming

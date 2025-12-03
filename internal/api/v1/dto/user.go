@@ -19,7 +19,7 @@ type UserResponseDTO struct {
 }
 
 type APIKeyRequestDTO struct {
-	Provider string `json:"provider" validate:"required,oneof=openai gemini"`
+	Provider string `json:"provider" validate:"required,oneof=openai gemini anthropic xai deepseek"`
 	APIKey   string `json:"api_key" validate:"required"`
 }
 

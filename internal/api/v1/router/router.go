@@ -112,8 +112,12 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	dlqRepo := repository.NewDLQRepository(pool)
 
 	openAIValidator := service.NewOpenAIValidator()
+	geminiValidator := service.NewGeminiValidator()
+	anthropicValidator := service.NewAnthropicValidator()
+	xaiValidator := service.NewXAIValidator()
+	deepseekValidator := service.NewDeepSeekValidator()
 	pythonClient := service.NewPythonClient(cfg.PythonServiceBaseURL, logger)
-	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo, secretManagerSvc, openAIValidator, logger)
+	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo, secretManagerSvc, openAIValidator, geminiValidator, anthropicValidator, xaiValidator, deepseekValidator, logger)
 	lectureSvc := service.NewLectureService(lectureRepo, userRepo, s3Client, cfg.S3Bucket, pubSubPublisher, cfg.PubSubIngestionTopic, logger)
 	courseSvc := service.NewCourseService(courseRepo, lectureSvc, logger)
 	summarySvc := service.NewSummaryService(summaryRepo, logger)
