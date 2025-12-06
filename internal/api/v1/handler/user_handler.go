@@ -36,6 +36,7 @@ func (h *UserHandler) RegisterRoutes(mux *http.ServeMux, authMw func(http.Handle
 	mux.Handle("/users/me/courses", authMw(http.HandlerFunc(h.getUserCourses)))
 	mux.Handle("/users/me/recents", authMw(http.HandlerFunc(h.getRecentLecturesWithCount)))
 	mux.Handle("/users/me/api-key", authMw(http.HandlerFunc(h.handleAPIKey)))
+	mux.Handle("/users/me/models", authMw(http.HandlerFunc(h.handleModels)))
 }
 
 func (h *UserHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
@@ -100,13 +101,14 @@ func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
 
 	// 6. Map domain model to response DTO
 	resp := dto.UserResponseDTO{
-		UserID:          createdUser.UserID,
-		Name:            createdUser.Name,
-		Email:           createdUser.Email,
-		AvatarURL:       createdUser.AvatarURL,
-		APIKeysProvided: createdUser.APIKeysProvided,
-		CreatedAt:       createdUser.CreatedAt,
-		UpdatedAt:       createdUser.UpdatedAt,
+		UserID:           createdUser.UserID,
+		Name:             createdUser.Name,
+		Email:            createdUser.Email,
+		AvatarURL:        createdUser.AvatarURL,
+		APIKeysProvided:  createdUser.APIKeysProvided,
+		ModelPreferences: createdUser.ModelPreferences,
+		CreatedAt:        createdUser.CreatedAt,
+		UpdatedAt:        createdUser.UpdatedAt,
 	}
 
 	// 7. Return response
@@ -147,13 +149,14 @@ func (h *UserHandler) getUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := dto.UserResponseDTO{
-		UserID:          user.UserID,
-		Name:            user.Name,
-		Email:           user.Email,
-		AvatarURL:       user.AvatarURL,
-		APIKeysProvided: user.APIKeysProvided,
-		CreatedAt:       user.CreatedAt,
-		UpdatedAt:       user.UpdatedAt,
+		UserID:           user.UserID,
+		Name:             user.Name,
+		Email:            user.Email,
+		AvatarURL:        user.AvatarURL,
+		APIKeysProvided:  user.APIKeysProvided,
+		ModelPreferences: user.ModelPreferences,
+		CreatedAt:        user.CreatedAt,
+		UpdatedAt:        user.UpdatedAt,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
@@ -300,6 +303,18 @@ func (h *UserHandler) handleAPIKey(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleModels manages listing and updating model preferences
+func (h *UserHandler) handleModels(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		h.listModels(w, r)
+	case http.MethodPut, http.MethodPatch:
+		h.updateModelPreference(w, r)
+	default:
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 // storeAPIKey godoc
 // @Summary Store user's API key
 // @Description Stores the user's API key securely in Google Cloud Secret Manager and updates the user profile flag. Supports providers: openai, gemini, anthropic, xai, and deepseek.
@@ -347,6 +362,108 @@ func (h *UserHandler) storeAPIKey(w http.ResponseWriter, r *http.Request) {
 	resp := dto.APIKeyResponseDTO{
 		Provider:       req.Provider,
 		HasProvidedKey: true,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+// listModels godoc
+// @Summary List available models for the user
+// @Description Returns curated models for providers where the user has added API keys, including enabled state
+// @Tags users
+// @Produce json
+// @Success 200 {object} dto.ModelsResponseDTO
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "User not found"
+// @Failure 500 {string} string "Failed to list models"
+// @Router /users/me/models [get]
+func (h *UserHandler) listModels(w http.ResponseWriter, r *http.Request) {
+	userId, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userId == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	models, err := h.userService.ListModels(r.Context(), userId)
+	if err != nil {
+		if errors.Is(err, service.ErrUserNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to list models: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := dto.ModelsResponseDTO{}
+	for _, pm := range models {
+		providerDTO := dto.ProviderModelsDTO{
+			Provider: pm.Provider,
+		}
+		for _, m := range pm.Models {
+			providerDTO.Models = append(providerDTO.Models, dto.ModelToggleDTO{
+				ID:      m.ID,
+				Name:    m.Name,
+				Enabled: m.Enabled,
+			})
+		}
+		resp.Providers = append(resp.Providers, providerDTO)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+// updateModelPreference godoc
+// @Summary Update a model enablement preference
+// @Description Toggles a curated model for a provider for the current user
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param preference body dto.ModelPreferenceRequestDTO true "Model preference update"
+// @Success 200 {object} dto.ModelToggleDTO
+// @Failure 400 {string} string "Invalid JSON payload or validation failed"
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 404 {string} string "User not found"
+// @Failure 500 {string} string "Failed to update model preference"
+// @Router /users/me/models [put]
+func (h *UserHandler) updateModelPreference(w http.ResponseWriter, r *http.Request) {
+	userId, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userId == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	var req dto.ModelPreferenceRequestDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.validate.Struct(&req); err != nil {
+		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.userService.SetModelPreference(r.Context(), userId, req.Provider, req.Model, req.Enabled); err != nil {
+		if errors.Is(err, service.ErrUserNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to update model preference: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with the updated state
+	resp := dto.ModelToggleDTO{
+		ID:      req.Model,
+		Name:    req.Model,
+		Enabled: req.Enabled,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

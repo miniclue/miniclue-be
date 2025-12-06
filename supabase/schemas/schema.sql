@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   email                 TEXT        DEFAULT '',
   avatar_url            TEXT        DEFAULT '',
   api_keys_provided     JSONB       DEFAULT '{}'::JSONB,
+  model_preferences     JSONB       DEFAULT '{}'::JSONB,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
