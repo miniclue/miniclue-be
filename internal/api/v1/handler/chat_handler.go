@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -561,7 +562,12 @@ func (h *ChatHandler) streamChat(w http.ResponseWriter, r *http.Request, lecture
 			if err == io.EOF {
 				break
 			}
-			h.logger.Error().Err(err).Msg("Error reading from Python service stream")
+			// If the context was canceled, it's likely a user-initiated stop, so we log it as Info/Debug
+			if errors.Is(err, context.Canceled) || errors.Is(r.Context().Err(), context.Canceled) {
+				h.logger.Debug().Err(err).Msg("Stream reading stopped by user (context canceled)")
+			} else {
+				h.logger.Error().Err(err).Msg("Error reading from Python service stream")
+			}
 			break
 		}
 
@@ -586,7 +592,11 @@ func (h *ChatHandler) streamChat(w http.ResponseWriter, r *http.Request, lecture
 				continue
 			}
 			if _, err := fmt.Fprintf(w, "data: %s\n\n", deltaJSON); err != nil {
-				h.logger.Error().Err(err).Msg("Failed to write delta part")
+				if errors.Is(r.Context().Err(), context.Canceled) {
+					h.logger.Debug().Err(err).Msg("Failed to write delta part: client disconnected")
+				} else {
+					h.logger.Error().Err(err).Msg("Failed to write delta part")
+				}
 				break
 			}
 			flusher.Flush()
@@ -607,7 +617,11 @@ func (h *ChatHandler) streamChat(w http.ResponseWriter, r *http.Request, lecture
 	}
 	textEndJSON, _ := json.Marshal(textEndPart)
 	if _, err := fmt.Fprintf(w, "data: %s\n\n", textEndJSON); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to write text-end part")
+		if errors.Is(r.Context().Err(), context.Canceled) {
+			h.logger.Debug().Err(err).Msg("Failed to write text-end part: client disconnected")
+		} else {
+			h.logger.Error().Err(err).Msg("Failed to write text-end part")
+		}
 	} else {
 		flusher.Flush()
 	}
@@ -618,14 +632,22 @@ func (h *ChatHandler) streamChat(w http.ResponseWriter, r *http.Request, lecture
 	}
 	finishJSON, _ := json.Marshal(finishPart)
 	if _, err := fmt.Fprintf(w, "data: %s\n\n", finishJSON); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to write finish part")
+		if errors.Is(r.Context().Err(), context.Canceled) {
+			h.logger.Debug().Err(err).Msg("Failed to write finish part: client disconnected")
+		} else {
+			h.logger.Error().Err(err).Msg("Failed to write finish part")
+		}
 	} else {
 		flusher.Flush()
 	}
 
 	// Send [DONE] marker to terminate stream
 	if _, err := fmt.Fprintf(w, "data: [DONE]\n\n"); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to write [DONE] marker")
+		if errors.Is(r.Context().Err(), context.Canceled) {
+			h.logger.Debug().Err(err).Msg("Failed to write [DONE] marker: client disconnected")
+		} else {
+			h.logger.Error().Err(err).Msg("Failed to write [DONE] marker")
+		}
 	} else {
 		flusher.Flush()
 	}
@@ -639,19 +661,25 @@ func (h *ChatHandler) streamChat(w http.ResponseWriter, r *http.Request, lecture
 		assistantMetadata := map[string]interface{}{
 			"model": req.Model,
 		}
-		_, err := h.chatService.CreateMessage(r.Context(), chatID, userID, "assistant", assistantParts, assistantMetadata)
+
+		// Use background context for saving the message, as the request context might be canceled
+		// if the user stopped the response halfway. We still want to save the partial response.
+		saveCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		_, err := h.chatService.CreateMessage(saveCtx, chatID, userID, "assistant", assistantParts, assistantMetadata)
 		if err != nil {
 			h.logger.Error().Err(err).Str("chat_id", chatID).Msg("Failed to save assistant message")
 		} else {
 			// Check if this is the first conversation (user + assistant = 2 messages) and trigger title generation
-			messageCount, err := h.chatService.GetMessageCount(r.Context(), chatID, userID)
+			messageCount, err := h.chatService.GetMessageCount(saveCtx, chatID, userID)
 			if err == nil && messageCount == 2 {
 				// This is the first conversation - generate title from both messages
 				// Title generation happens asynchronously, frontend will poll for updates
 				// Use background context with timeout instead of request context (which gets canceled)
-				titleCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				titleCtx, titleCancel := context.WithTimeout(context.Background(), 30*time.Second)
 				go func() {
-					defer cancel()
+					defer titleCancel()
 					h.chatService.GenerateAndUpdateTitle(
 						titleCtx,
 						lectureID,
