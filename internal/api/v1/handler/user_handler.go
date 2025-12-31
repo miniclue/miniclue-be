@@ -46,6 +46,10 @@ func (h *UserHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
 
 	case r.Method == http.MethodGet && r.URL.Path == "/users/me":
 		h.getUser(w, r)
+
+	case r.Method == http.MethodDelete && r.URL.Path == "/users/me":
+		h.deleteUser(w, r)
+
 	default:
 		http.NotFound(w, r)
 	}
@@ -526,4 +530,30 @@ func (h *UserHandler) deleteAPIKey(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
+}
+
+// deleteUser godoc
+// @Summary Delete user profile and resources
+// @Description Deletes the profile of the authenticated user and cleans up all associated resources including S3 files and Secret Manager secrets.
+// @Tags users
+// @Produce json
+// @Success 204 {string} string "No Content"
+// @Failure 401 {string} string "Unauthorized: User ID not found in context"
+// @Failure 500 {string} string "Failed to delete user and resources"
+// @Router /users/me [delete]
+func (h *UserHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
+	userId, ok := r.Context().Value(middleware.UserContextKey).(string)
+	if !ok || userId == "" {
+		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	err := h.userService.DeleteUser(r.Context(), userId)
+	if err != nil {
+		h.logger.Error().Err(err).Str("user_id", userId).Msg("Failed to delete user and resources")
+		http.Error(w, "Failed to delete user: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

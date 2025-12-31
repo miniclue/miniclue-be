@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS embeddings (
   slide_id     UUID         NOT NULL,
   lecture_id   UUID         NOT NULL,
   slide_number INT          NOT NULL,
-  vector       VECTOR(1536) NOT NULL,
+  vector       VECTOR(768)  NOT NULL,
   metadata     JSONB        NOT NULL DEFAULT '{}'::JSONB,
   created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),

@@ -17,6 +17,7 @@ type UserRepository interface {
 	UpdateAPIKeyFlag(ctx context.Context, userID string, provider string, hasKey bool) error
 	UpdateModelPreference(ctx context.Context, userID string, provider string, model string, enabled bool) error
 	InitializeDefaultModels(ctx context.Context, userID string, provider string, models []string) error
+	DeleteUser(ctx context.Context, id string) error
 }
 
 type userRepo struct {
@@ -132,6 +133,15 @@ func (r *userRepo) InitializeDefaultModels(ctx context.Context, userID string, p
 	}
 	if result.RowsAffected() == 0 {
 		return fmt.Errorf("no rows affected: user %s may not exist in database", userID)
+	}
+	return nil
+}
+
+func (r *userRepo) DeleteUser(ctx context.Context, id string) error {
+	query := `DELETE FROM user_profiles WHERE user_id = $1`
+	_, err := r.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("deleting user %s: %w", id, err)
 	}
 	return nil
 }

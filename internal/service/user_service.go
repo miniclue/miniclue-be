@@ -25,12 +25,14 @@ type UserService interface {
 	DeleteAPIKey(ctx context.Context, userID, provider string) error
 	ListModels(ctx context.Context, userID string) ([]ProviderModels, error)
 	SetModelPreference(ctx context.Context, userID, provider, modelName string, enabled bool) error
+	DeleteUser(ctx context.Context, userID string) error
 }
 
 type userService struct {
 	userRepo           repository.UserRepository
 	courseRepo         repository.CourseRepository
 	lectureRepo        repository.LectureRepository
+	lectureSvc         LectureService
 	secretManagerSvc   SecretManagerService
 	openAIValidator    OpenAIValidator
 	geminiValidator    GeminiValidator
@@ -127,11 +129,12 @@ var defaultModelCatalog = map[string][]string{
 	},
 }
 
-func NewUserService(userRepo repository.UserRepository, courseRepo repository.CourseRepository, lectureRepo repository.LectureRepository, secretManagerSvc SecretManagerService, openAIValidator OpenAIValidator, geminiValidator GeminiValidator, anthropicValidator AnthropicValidator, xaiValidator XAIValidator, deepseekValidator DeepSeekValidator, logger zerolog.Logger) UserService {
+func NewUserService(userRepo repository.UserRepository, courseRepo repository.CourseRepository, lectureRepo repository.LectureRepository, lectureSvc LectureService, secretManagerSvc SecretManagerService, openAIValidator OpenAIValidator, geminiValidator GeminiValidator, anthropicValidator AnthropicValidator, xaiValidator XAIValidator, deepseekValidator DeepSeekValidator, logger zerolog.Logger) UserService {
 	return &userService{
 		userRepo:           userRepo,
 		courseRepo:         courseRepo,
 		lectureRepo:        lectureRepo,
+		lectureSvc:         lectureSvc,
 		secretManagerSvc:   secretManagerSvc,
 		openAIValidator:    openAIValidator,
 		geminiValidator:    geminiValidator,
@@ -384,5 +387,42 @@ func (s *userService) SetModelPreference(ctx context.Context, userID, provider, 
 		return err
 	}
 
+	return nil
+}
+
+func (s *userService) DeleteUser(ctx context.Context, userID string) error {
+	// 1. Clean up Lectures (and S3)
+	// Get all lectures for the user across all courses
+	lectures, err := s.lectureRepo.GetLecturesByUserID(ctx, userID, 1000, 0)
+	if err != nil {
+		s.userLogger.Error().Err(err).Str("user_id", userID).Msg("Failed to get lectures for user cleanup")
+		return fmt.Errorf("getting lectures for cleanup: %w", err)
+	}
+
+	for _, l := range lectures {
+		// This handles S3 object deletion and database record deletion
+		if err := s.lectureSvc.DeleteLecture(ctx, l.ID); err != nil {
+			s.userLogger.Error().Err(err).Str("user_id", userID).Str("lecture_id", l.ID).Msg("Failed to delete lecture during user cleanup")
+			// Continue with other lectures/cleanup even if one fails
+		}
+	}
+
+	// 2. Clean up API Keys in Secret Manager
+	providers := []string{"openai", "gemini", "anthropic", "xai", "deepseek"}
+	for _, p := range providers {
+		err := s.secretManagerSvc.DeleteUserAPIKey(ctx, userID, p)
+		if err != nil {
+			// Secret might not exist, which is fine
+			s.userLogger.Debug().Err(err).Str("user_id", userID).Str("provider", p).Msg("Failed to delete API key from Secret Manager (may not exist)")
+		}
+	}
+
+	// 3. Delete user profile record (cascades to remaining related records like courses, etc.)
+	if err := s.userRepo.DeleteUser(ctx, userID); err != nil {
+		s.userLogger.Error().Err(err).Str("user_id", userID).Msg("Failed to delete user profile")
+		return fmt.Errorf("deleting user profile: %w", err)
+	}
+
+	s.userLogger.Info().Str("user_id", userID).Msg("User resources and profile cleaned up successfully")
 	return nil
 }
