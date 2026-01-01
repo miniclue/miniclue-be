@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"app/internal/api/v1/dto"
 	"app/internal/middleware"
@@ -352,6 +353,11 @@ func (h *UserHandler) storeAPIKey(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	err := h.userService.StoreAPIKey(ctx, userId, req.Provider, req.APIKey)
 	if err != nil {
+		// Check if provider is disabled (400 Bad Request)
+		if strings.Contains(err.Error(), "is currently disabled") {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		h.logger.Error().
 			Err(err).
 			Str("user_id", userId).

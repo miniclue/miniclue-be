@@ -68,6 +68,13 @@ var providerOrder = []string{
 	"deepseek",
 }
 
+// disabledProviders contains providers that are disabled but not deleted.
+// These providers will not appear in the UI and cannot have API keys stored.
+// Deepseek is disabled because its models are not multimodal.
+var disabledProviders = map[string]bool{
+	"deepseek": true,
+}
+
 // curatedModelCatalog holds a static list of models per provider.
 // These are placeholders and can be updated later without changing the API surface.
 var curatedModelCatalog = map[string][]catalogEntry{
@@ -210,6 +217,11 @@ func (s *userService) StoreAPIKey(ctx context.Context, userID, provider, apiKey 
 		return errors.New("provider cannot be empty")
 	}
 
+	// Check if provider is disabled
+	if disabledProviders[provider] {
+		return fmt.Errorf("provider %s is currently disabled", provider)
+	}
+
 	// Fetch user to check if they already have an API key for this provider
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
@@ -324,6 +336,11 @@ func (s *userService) ListModels(ctx context.Context, userID string) ([]Provider
 	var result []ProviderModels
 	// Iterate in defined order to ensure consistent provider sequence
 	for _, provider := range providerOrder {
+		// Skip disabled providers
+		if disabledProviders[provider] {
+			continue
+		}
+
 		models, exists := curatedModelCatalog[provider]
 		if !exists {
 			continue
@@ -359,6 +376,11 @@ func (s *userService) ListModels(ctx context.Context, userID string) ([]Provider
 }
 
 func (s *userService) SetModelPreference(ctx context.Context, userID, provider, modelName string, enabled bool) error {
+	// Check if provider is disabled
+	if disabledProviders[provider] {
+		return fmt.Errorf("provider %s is currently disabled", provider)
+	}
+
 	entries, ok := curatedModelCatalog[provider]
 	if !ok {
 		return fmt.Errorf("unsupported provider: %s", provider)
