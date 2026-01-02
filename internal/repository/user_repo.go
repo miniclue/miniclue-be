@@ -138,23 +138,24 @@ func (r *userRepo) UpdateAPIKeyFlagAndInitializeModels(ctx context.Context, user
 	// Atomically update both api_keys_provided and model_preferences in a single query
 	// Pass []byte directly to parameters (pgx will handle JSONB correctly)
 	query := `
-		UPDATE user_profiles
-		SET 
-			api_keys_provided = jsonb_set(
-				COALESCE(api_keys_provided, '{}'::jsonb),
-				ARRAY[$1::text],
-				$2,
-				true
-			),
-			model_preferences = jsonb_set(
-				COALESCE(model_preferences, '{}'::jsonb),
-				ARRAY[$1::text],
-				$3,
-				true
-			),
-			updated_at = NOW()
-		WHERE user_id = $4
-	`
+    UPDATE user_profiles
+    SET 
+        api_keys_provided = jsonb_set(
+            COALESCE(api_keys_provided, '{}'::jsonb),
+            ARRAY[$1::text],
+            $2::jsonb, -- Force cast here
+            true
+        ),
+        model_preferences = jsonb_set(
+            COALESCE(model_preferences, '{}'::jsonb),
+            ARRAY[$1::text],
+            $3::jsonb, -- Force cast here
+            true
+        ),
+        updated_at = NOW()
+    WHERE user_id = $4
+`
+
 	result, err := r.pool.Exec(ctx, query, provider, boolJSON, prefJSON, userID)
 
 	if err != nil {
