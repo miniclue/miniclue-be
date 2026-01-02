@@ -30,7 +30,7 @@ jobs:
           PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
         run: |
           supabase link --project-ref $PROJECT_ID
-          supabase db push
+          supabase db push --debug
 
       - name: Authenticate to Google Cloud
         id: auth
