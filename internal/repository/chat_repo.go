@@ -177,7 +177,7 @@ func (r *chatRepo) CreateMessage(ctx context.Context, chatID, role string, parts
 		RETURNING id, chat_id, role, parts, created_at
 	`
 	var message model.Message
-	err = r.pool.QueryRow(ctx, query, chatID, role, string(partsJSON), string(metadataJSON)).Scan(
+	err = r.pool.QueryRow(ctx, query, chatID, role, partsJSON, metadataJSON).Scan(
 		&message.ID,
 		&message.ChatID,
 		&message.Role,

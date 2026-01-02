@@ -40,14 +40,12 @@ func (s *dlqService) ProcessAndSave(ctx context.Context, req *dto.PubSubPushRequ
 		decodedPayload = []byte(req.Message.Data) // Save the raw base64 string
 	}
 
-	// Marshal attributes to a JSON string, if they exist
-	var attributesJSON *string
+	// Marshal attributes to JSON bytes, if they exist
+	var attributesJSON []byte
 	if len(req.Message.Attributes) > 0 {
-		attrBytes, err := json.Marshal(req.Message.Attributes)
-		if err == nil {
-			attrStr := string(attrBytes)
-			attributesJSON = &attrStr
-		} else {
+		var err error
+		attributesJSON, err = json.Marshal(req.Message.Attributes)
+		if err != nil {
 			s.dlqLogger.Warn().Err(err).Str("message_id", req.Message.MessageID).Msg("Failed to marshal DLQ message attributes")
 		}
 	}
@@ -56,7 +54,7 @@ func (s *dlqService) ProcessAndSave(ctx context.Context, req *dto.PubSubPushRequ
 	dbMessage := &model.DeadLetterMessage{
 		SubscriptionName: req.Subscription,
 		MessageID:        req.Message.MessageID,
-		Payload:          string(decodedPayload),
+		Payload:          decodedPayload,
 		Attributes:       attributesJSON,
 		Status:           "unprocessed", // Default status
 	}

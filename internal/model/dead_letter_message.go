@@ -7,8 +7,8 @@ type DeadLetterMessage struct {
 	ID               string    `db:"id"`
 	SubscriptionName string    `db:"subscription_name"`
 	MessageID        string    `db:"message_id"`
-	Payload          string    `db:"payload"`    // Should be a JSON string
-	Attributes       *string   `db:"attributes"` // Can be null, should be a JSON string
+	Payload          []byte    `db:"payload"`    // Should be a JSON byte slice
+	Attributes       []byte    `db:"attributes"` // Can be null, should be a JSON byte slice
 	Status           string    `db:"status"`
 	CreatedAt        time.Time `db:"created_at"`
 	UpdatedAt        time.Time `db:"updated_at"`

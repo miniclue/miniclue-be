@@ -45,8 +45,8 @@ func (r *userRepo) CreateUser(ctx context.Context, u *model.User) error {
 		return fmt.Errorf("marshaling model preferences: %w", err)
 	}
 
-	query := `INSERT INTO user_profiles (user_id, name, email, avatar_url, api_keys_provided, model_preferences) VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb) ON CONFLICT (user_id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, avatar_url = EXCLUDED.avatar_url, api_keys_provided = EXCLUDED.api_keys_provided, model_preferences = EXCLUDED.model_preferences, updated_at = NOW() RETURNING user_id, name, email, avatar_url, api_keys_provided, model_preferences, created_at, updated_at;`
-	err = r.pool.QueryRow(ctx, query, u.UserID, u.Name, u.Email, u.AvatarURL, string(apiKeysJSON), string(modelPrefsJSON)).Scan(&u.UserID, &u.Name, &u.Email, &u.AvatarURL, &u.APIKeysProvided, &u.ModelPreferences, &u.CreatedAt, &u.UpdatedAt)
+	query := `INSERT INTO user_profiles (user_id, name, email, avatar_url, api_keys_provided, model_preferences) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (user_id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, avatar_url = EXCLUDED.avatar_url, api_keys_provided = EXCLUDED.api_keys_provided, model_preferences = EXCLUDED.model_preferences, updated_at = NOW() RETURNING user_id, name, email, avatar_url, api_keys_provided, model_preferences, created_at, updated_at;`
+	err = r.pool.QueryRow(ctx, query, u.UserID, u.Name, u.Email, u.AvatarURL, apiKeysJSON, modelPrefsJSON).Scan(&u.UserID, &u.Name, &u.Email, &u.AvatarURL, &u.APIKeysProvided, &u.ModelPreferences, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("creating user %s: %w", u.UserID, err)
 	}
@@ -73,8 +73,8 @@ func (r *userRepo) UpdateAPIKeyFlag(ctx context.Context, userID string, provider
 		return fmt.Errorf("marshaling boolean: %w", err)
 	}
 
-	query := `UPDATE user_profiles SET api_keys_provided = jsonb_set(COALESCE(api_keys_provided, '{}'::jsonb), ARRAY[$1::text], $2::jsonb, true), updated_at = NOW() WHERE user_id = $3`
-	result, err := r.pool.Exec(ctx, query, provider, string(boolJSON), userID)
+	query := `UPDATE user_profiles SET api_keys_provided = jsonb_set(COALESCE(api_keys_provided, '{}'::jsonb), ARRAY[$1::text], $2, true), updated_at = NOW() WHERE user_id = $3`
+	result, err := r.pool.Exec(ctx, query, provider, boolJSON, userID)
 	if err != nil {
 		return fmt.Errorf("updating API key flag for user %s, provider %s: %w", userID, provider, err)
 	}
@@ -99,13 +99,13 @@ func (r *userRepo) UpdateModelPreference(ctx context.Context, userID string, pro
 		SET model_preferences = jsonb_set(
 			COALESCE(model_preferences, '{}'::jsonb) || jsonb_build_object($1::text, COALESCE(model_preferences->$1, '{}'::jsonb)),
 			ARRAY[$1::text, $2::text],
-			$3::jsonb,
+			$3,
 			true
 		),
 		updated_at = NOW()
 		WHERE user_id = $4
 	`
-	result, err := r.pool.Exec(ctx, query, provider, modelName, string(boolJSON), userID)
+	result, err := r.pool.Exec(ctx, query, provider, modelName, boolJSON, userID)
 	if err != nil {
 		return fmt.Errorf("updating model preference for user %s, provider %s, model %s: %w", userID, provider, modelName, err)
 	}
@@ -136,26 +136,26 @@ func (r *userRepo) UpdateAPIKeyFlagAndInitializeModels(ctx context.Context, user
 	}
 
 	// Atomically update both api_keys_provided and model_preferences in a single query
-	// Cast JSON bytes to string to ensure correct handling by pgx/postgres
+	// Pass []byte directly to parameters (pgx will handle JSONB correctly)
 	query := `
 		UPDATE user_profiles
 		SET 
 			api_keys_provided = jsonb_set(
 				COALESCE(api_keys_provided, '{}'::jsonb),
 				ARRAY[$1::text],
-				$2::jsonb,
+				$2,
 				true
 			),
 			model_preferences = jsonb_set(
 				COALESCE(model_preferences, '{}'::jsonb),
 				ARRAY[$1::text],
-				$3::jsonb,
+				$3,
 				true
 			),
 			updated_at = NOW()
 		WHERE user_id = $4
 	`
-	result, err := r.pool.Exec(ctx, query, provider, string(boolJSON), string(prefJSON), userID)
+	result, err := r.pool.Exec(ctx, query, provider, boolJSON, prefJSON, userID)
 
 	if err != nil {
 		return fmt.Errorf("updating API key flag and initializing models for user %s, provider %s: %w", userID, provider, err)

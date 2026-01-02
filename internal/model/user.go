@@ -25,17 +25,9 @@ type APIKeysProvided map[string]bool
 // Value implements the driver.Valuer interface for JSONB
 func (a APIKeysProvided) Value() (driver.Value, error) {
 	if a == nil {
-		bytes, err := json.Marshal(map[string]bool{})
-		if err != nil {
-			return nil, err
-		}
-		return string(bytes), nil
+		return json.Marshal(map[string]bool{})
 	}
-	bytes, err := json.Marshal(a)
-	if err != nil {
-		return nil, err
-	}
-	return string(bytes), nil
+	return json.Marshal(a)
 }
 
 // Scan implements the sql.Scanner interface for JSONB
@@ -71,17 +63,9 @@ type ModelPreferences map[string]map[string]bool
 // Value implements the driver.Valuer interface for JSONB
 func (m ModelPreferences) Value() (driver.Value, error) {
 	if m == nil {
-		bytes, err := json.Marshal(map[string]map[string]bool{})
-		if err != nil {
-			return nil, err
-		}
-		return string(bytes), nil
+		return json.Marshal(map[string]map[string]bool{})
 	}
-	bytes, err := json.Marshal(m)
-	if err != nil {
-		return nil, err
-	}
-	return string(bytes), nil
+	return json.Marshal(m)
 }
 
 // Scan implements the sql.Scanner interface for JSONB
