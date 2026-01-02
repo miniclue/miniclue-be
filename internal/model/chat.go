@@ -53,9 +53,17 @@ type Reference struct {
 // Value implements the driver.Valuer interface for JSONB
 func (m MessageParts) Value() (driver.Value, error) {
 	if m == nil {
-		return json.Marshal([]MessagePart{})
+		bytes, err := json.Marshal([]MessagePart{})
+		if err != nil {
+			return nil, err
+		}
+		return string(bytes), nil
 	}
-	return json.Marshal(m)
+	bytes, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
+	}
+	return string(bytes), nil
 }
 
 // Scan implements the sql.Scanner interface for JSONB

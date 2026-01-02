@@ -46,7 +46,7 @@ func (r *userRepo) CreateUser(ctx context.Context, u *model.User) error {
 	}
 
 	query := `INSERT INTO user_profiles (user_id, name, email, avatar_url, api_keys_provided, model_preferences) VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb) ON CONFLICT (user_id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, avatar_url = EXCLUDED.avatar_url, api_keys_provided = EXCLUDED.api_keys_provided, model_preferences = EXCLUDED.model_preferences, updated_at = NOW() RETURNING user_id, name, email, avatar_url, api_keys_provided, model_preferences, created_at, updated_at;`
-	err = r.pool.QueryRow(ctx, query, u.UserID, u.Name, u.Email, u.AvatarURL, apiKeysJSON, modelPrefsJSON).Scan(&u.UserID, &u.Name, &u.Email, &u.AvatarURL, &u.APIKeysProvided, &u.ModelPreferences, &u.CreatedAt, &u.UpdatedAt)
+	err = r.pool.QueryRow(ctx, query, u.UserID, u.Name, u.Email, u.AvatarURL, string(apiKeysJSON), string(modelPrefsJSON)).Scan(&u.UserID, &u.Name, &u.Email, &u.AvatarURL, &u.APIKeysProvided, &u.ModelPreferences, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("creating user %s: %w", u.UserID, err)
 	}
@@ -136,7 +136,7 @@ func (r *userRepo) UpdateAPIKeyFlagAndInitializeModels(ctx context.Context, user
 	}
 
 	// Atomically update both api_keys_provided and model_preferences in a single query
-	// Pass []byte directly to ::jsonb parameters (proven pattern from CreateUser)
+	// Cast JSON bytes to string to ensure correct handling by pgx/postgres
 	query := `
 		UPDATE user_profiles
 		SET 
