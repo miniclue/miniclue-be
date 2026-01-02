@@ -74,7 +74,7 @@ func (r *userRepo) UpdateAPIKeyFlag(ctx context.Context, userID string, provider
 	}
 
 	query := `UPDATE user_profiles SET api_keys_provided = jsonb_set(COALESCE(api_keys_provided, '{}'::jsonb), ARRAY[$1::text], $2::jsonb, true), updated_at = NOW() WHERE user_id = $3`
-	result, err := r.pool.Exec(ctx, query, provider, boolJSON, userID)
+	result, err := r.pool.Exec(ctx, query, provider, string(boolJSON), userID)
 	if err != nil {
 		return fmt.Errorf("updating API key flag for user %s, provider %s: %w", userID, provider, err)
 	}
@@ -105,7 +105,7 @@ func (r *userRepo) UpdateModelPreference(ctx context.Context, userID string, pro
 		updated_at = NOW()
 		WHERE user_id = $4
 	`
-	result, err := r.pool.Exec(ctx, query, provider, modelName, boolJSON, userID)
+	result, err := r.pool.Exec(ctx, query, provider, modelName, string(boolJSON), userID)
 	if err != nil {
 		return fmt.Errorf("updating model preference for user %s, provider %s, model %s: %w", userID, provider, modelName, err)
 	}
@@ -155,7 +155,8 @@ func (r *userRepo) UpdateAPIKeyFlagAndInitializeModels(ctx context.Context, user
 			updated_at = NOW()
 		WHERE user_id = $4
 	`
-	result, err := r.pool.Exec(ctx, query, provider, boolJSON, prefJSON, userID)
+	result, err := r.pool.Exec(ctx, query, provider, string(boolJSON), string(prefJSON), userID)
+
 	if err != nil {
 		return fmt.Errorf("updating API key flag and initializing models for user %s, provider %s: %w", userID, provider, err)
 	}

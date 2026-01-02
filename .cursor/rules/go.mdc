@@ -37,26 +37,3 @@ Leverage the power and simplicity of Go's standard library to create efficient a
 Do not write any migrations. Only make edits to the Supabase database schema. Migrations will be handled by myself.
 
 Write all necessary godoc comments. Do not run 'make swagger' to update the Swagger documentation. I will run it myself after you have finished implementing the feature.
-
-## JSONB Handling Pattern
-
-When updating or inserting JSONB columns in PostgreSQL (via pgx):
-
-1. **Marshal in Go**: Always marshal your data structure (or primitive like bool/string) into JSON bytes in the Go service/repository layer first.
-2. **Pass as Bytes**: Pass the resulting `[]byte` directly to the SQL query.
-3. **Explicit Casting**: Use `$N::jsonb` in the SQL query to cast the parameter.
-4. **Avoid to_jsonb()**: Do NOT use the PostgreSQL `to_jsonb()` function for parameter binding, as it can behave inconsistently across environments.
-
-Example:
-
-```go
-// 1. Marshal in Go
-dataJSON, err := json.Marshal(myData)
-if err != nil {
-    return fmt.Errorf("marshaling: %w", err)
-}
-
-// 2. Pass bytes and use explicit ::jsonb casting
-query := `UPDATE table SET column = $1::jsonb WHERE id = $2`
-_, err = r.pool.Exec(ctx, query, dataJSON, id)
-```
