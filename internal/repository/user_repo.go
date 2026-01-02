@@ -69,7 +69,7 @@ func (r *userRepo) GetUserByID(ctx context.Context, id string) (*model.User, err
 func (r *userRepo) UpdateAPIKeyFlag(ctx context.Context, userID string, provider string, hasKey bool) error {
 	// Use jsonb_set with to_jsonb to properly convert the boolean to JSONB
 	// This avoids issues with JSON marshaling and type casting in PostgreSQL
-	query := `UPDATE user_profiles SET api_keys_provided = jsonb_set(COALESCE(api_keys_provided, '{}'::jsonb), ARRAY[$1], to_jsonb($2::boolean), true), updated_at = NOW() WHERE user_id = $3`
+	query := `UPDATE user_profiles SET api_keys_provided = jsonb_set(COALESCE(api_keys_provided, '{}'::jsonb), ARRAY[$1::text], to_jsonb($2::boolean), true), updated_at = NOW() WHERE user_id = $3`
 	result, err := r.pool.Exec(ctx, query, provider, hasKey, userID)
 	if err != nil {
 		return fmt.Errorf("updating API key flag for user %s, provider %s: %w", userID, provider, err)
@@ -116,18 +116,20 @@ func (r *userRepo) InitializeDefaultModels(ctx context.Context, userID string, p
 		return fmt.Errorf("marshaling default models: %w", err)
 	}
 
+	// Use to_jsonb($2::text) to ensure the JSON string is properly converted to JSONB
+	// and ARRAY[$1::text] for explicit type casting
 	query := `
 		UPDATE user_profiles
 		SET model_preferences = jsonb_set(
 			COALESCE(model_preferences, '{}'::jsonb),
 			ARRAY[$1::text],
-			$2::jsonb,
+			to_jsonb($2::text),
 			true
 		),
 		updated_at = NOW()
 		WHERE user_id = $3
 	`
-	result, err := r.pool.Exec(ctx, query, provider, prefJSON, userID)
+	result, err := r.pool.Exec(ctx, query, provider, string(prefJSON), userID)
 	if err != nil {
 		return fmt.Errorf("initializing default models for user %s, provider %s: %w", userID, provider, err)
 	}

@@ -236,6 +236,12 @@ func (s *userService) StoreAPIKey(ctx context.Context, userID, provider, apiKey 
 
 	alreadyHasKey := user.APIKeysProvided[provider]
 
+	s.userLogger.Info().
+		Str("user_id", userID).
+		Str("provider", provider).
+		Bool("already_has_key", alreadyHasKey).
+		Msg("Storing API key")
+
 	// Validate API key before storing based on provider
 	var validationErr error
 	switch provider {
