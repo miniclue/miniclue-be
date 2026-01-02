@@ -116,6 +116,8 @@ drop table "public"."summaries";
 
 alter table "public"."lectures" alter column "status" drop default;
 
+update "public"."lectures" set status = 'complete' where status::text in ('explaining', 'summarising');
+
 alter type "public"."lecture_status" rename to "lecture_status__old_version_to_be_dropped";
 
 create type "public"."lecture_status" as enum ('uploading', 'pending_processing', 'parsing', 'processing', 'complete', 'failed');
