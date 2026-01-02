@@ -24,15 +24,15 @@ func NewDLQRepository(pool *pgxpool.Pool) DLQRepository {
 func (r *dlqRepository) Create(ctx context.Context, message *model.DeadLetterMessage) error {
 	query := `
         INSERT INTO dead_letter_messages (subscription_name, message_id, payload, attributes, status)
-        VALUES ($1, $2, $3, $4, $5)
+        VALUES ($1, $2, $3::jsonb, $4::jsonb, $5)
     `
 	_, err := r.pool.Exec(
 		ctx,
 		query,
 		message.SubscriptionName,
 		message.MessageID,
-		message.Payload,
-		message.Attributes,
+		string(message.Payload),
+		string(message.Attributes),
 		message.Status,
 	)
 	if err != nil {
