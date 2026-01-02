@@ -17,24 +17,20 @@ import (
 // LectureHandler handles flat lecture endpoints
 
 type LectureHandler struct {
-	lectureService     service.LectureService
-	courseService      service.CourseService
-	summaryService     service.SummaryService
-	explanationService service.ExplanationService
-	noteService        service.NoteService
-	chatHandler        *ChatHandler
-	validate           *validator.Validate
-	s3BaseURL          string
-	s3Bucket           string
-	logger             zerolog.Logger
+	lectureService service.LectureService
+	courseService  service.CourseService
+	noteService    service.NoteService
+	chatHandler    *ChatHandler
+	validate       *validator.Validate
+	s3BaseURL      string
+	s3Bucket       string
+	logger         zerolog.Logger
 }
 
 // NewLectureHandler creates a new LectureHandler
 func NewLectureHandler(
 	lectureService service.LectureService,
 	courseService service.CourseService,
-	summaryService service.SummaryService,
-	explanationService service.ExplanationService,
 	noteService service.NoteService,
 	chatHandler *ChatHandler,
 	validate *validator.Validate,
@@ -43,16 +39,14 @@ func NewLectureHandler(
 	logger zerolog.Logger,
 ) *LectureHandler {
 	return &LectureHandler{
-		lectureService:     lectureService,
-		courseService:      courseService,
-		summaryService:     summaryService,
-		explanationService: explanationService,
-		noteService:        noteService,
-		chatHandler:        chatHandler,
-		validate:           validate,
-		s3BaseURL:          s3BaseURL,
-		s3Bucket:           s3Bucket,
-		logger:             logger,
+		lectureService: lectureService,
+		courseService:  courseService,
+		noteService:    noteService,
+		chatHandler:    chatHandler,
+		validate:       validate,
+		s3BaseURL:      s3BaseURL,
+		s3Bucket:       s3Bucket,
+		logger:         logger,
 	}
 }
 
@@ -77,14 +71,6 @@ func (h *LectureHandler) handleLecture(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
-		if strings.HasSuffix(path, "/summary") {
-			h.getLectureSummary(w, r)
-			return
-		}
-		if strings.HasSuffix(path, "/explanations") {
-			h.listLectureExplanations(w, r)
-			return
-		}
 		if strings.HasSuffix(path, "/url") {
 			h.getSignedURL(w, r)
 			return
@@ -155,6 +141,7 @@ func (h *LectureHandler) getLecture(w http.ResponseWriter, r *http.Request) {
 		Title:       lecture.Title,
 		StoragePath: lecture.StoragePath,
 		Status:      lecture.Status,
+		TotalSlides: lecture.TotalSlides,
 		CreatedAt:   lecture.CreatedAt,
 		UpdatedAt:   lecture.UpdatedAt,
 		AccessedAt:  lecture.AccessedAt,
@@ -243,6 +230,7 @@ func (h *LectureHandler) updateLecture(w http.ResponseWriter, r *http.Request) {
 		Title:       lecture.Title,
 		StoragePath: lecture.StoragePath,
 		Status:      lecture.Status,
+		TotalSlides: lecture.TotalSlides,
 		CreatedAt:   lecture.CreatedAt,
 		UpdatedAt:   lecture.UpdatedAt,
 		AccessedAt:  lecture.AccessedAt,
@@ -255,7 +243,7 @@ func (h *LectureHandler) updateLecture(w http.ResponseWriter, r *http.Request) {
 
 // deleteLecture godoc
 // @Summary Delete a lecture
-// @Description Deletes a lecture and all its derived database records, removes its PDF from storage, and clears related pending jobs from ingestion, embedding, explanation, and summary queues.
+// @Description Deletes a lecture and all its derived database records, removes its PDF from storage, and clears related pending jobs from ingestion and embedding queues.
 // @Tags lectures
 // @Produce json
 // @Param lectureId path string true "Lecture ID"
@@ -362,135 +350,10 @@ func (h *LectureHandler) listLectures(w http.ResponseWriter, r *http.Request) {
 			Title:       lec.Title,
 			StoragePath: lec.StoragePath,
 			Status:      lec.Status,
+			TotalSlides: lec.TotalSlides,
 			CreatedAt:   lec.CreatedAt,
 			UpdatedAt:   lec.UpdatedAt,
 			AccessedAt:  lec.AccessedAt,
-		})
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to encode response")
-	}
-}
-
-// getLectureSummary godoc
-// @Summary Get lecture summary (DEPRECATED)
-// @Description DEPRECATED: This endpoint is no longer actively generating new summaries. Summary generation (Step 6 in data flow) has been removed. This endpoint may still return legacy data from existing lectures but will return empty content for newly uploaded lectures.
-// @Tags lectures
-// @Produce json
-// @Param lectureId path string true "Lecture ID"
-// @Success 200 {object} dto.LectureSummaryResponseDTO
-// @Failure 401 {string} string "Unauthorized: User ID not found in context"
-// @Failure 404 {string} string "Lecture not found"
-// @Failure 500 {string} string "Failed to retrieve summary"
-// @Router /lectures/{lectureId}/summary [get]
-// @Deprecated
-func (h *LectureHandler) getLectureSummary(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
-	if !ok || userID == "" {
-		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
-		return
-	}
-	lectureID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/lectures/"), "/summary")
-	// verify lecture exists and ownership
-	lecture, err := h.lectureService.GetLectureByID(r.Context(), lectureID)
-	if err != nil {
-		http.Error(w, "Failed to retrieve lecture: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if lecture == nil {
-		http.Error(w, "Lecture not found", http.StatusNotFound)
-		return
-	}
-	course, err := h.courseService.GetCourseByID(r.Context(), lecture.CourseID)
-	if err != nil || course == nil || course.UserID != userID {
-		http.Error(w, "Lecture not found", http.StatusNotFound)
-		return
-	}
-	// fetch summary
-	summary, err := h.summaryService.GetSummaryByLectureID(r.Context(), lectureID)
-	if err != nil {
-		http.Error(w, "Failed to retrieve summary: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	content := ""
-	if summary != nil {
-		content = summary.Content
-	}
-	resp := dto.LectureSummaryResponseDTO{LectureID: lectureID, Content: content}
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to encode response")
-	}
-}
-
-// listLectureExplanations godoc
-// @Summary List lecture explanations (DEPRECATED)
-// @Description DEPRECATED: This endpoint is no longer actively generating new explanations. Explanation generation (Step 5 in data flow) has been removed. This endpoint may still return legacy data from existing lectures but will return empty arrays for newly uploaded lectures.
-// @Tags lectures
-// @Produce json
-// @Param lectureId path string true "Lecture ID"
-// @Param limit query int false "Limit number of results (if omitted, returns all explanations)"
-// @Param offset query int false "Pagination offset (default 0)"
-// @Success 200 {array} dto.LectureExplanationResponseDTO
-// @Failure 401 {string} string "Unauthorized: User ID not found in context"
-// @Failure 404 {string} string "Lecture not found"
-// @Failure 500 {string} string "Failed to retrieve explanations"
-// @Router /lectures/{lectureId}/explanations [get]
-// @Deprecated
-func (h *LectureHandler) listLectureExplanations(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(middleware.UserContextKey).(string)
-	if !ok || userID == "" {
-		http.Error(w, "Unauthorized: User ID not found in context", http.StatusUnauthorized)
-		return
-	}
-	// extract lectureId
-	lectureID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/lectures/"), "/explanations")
-	// verify lecture exists
-	lecture, err := h.lectureService.GetLectureByID(r.Context(), lectureID)
-	if err != nil {
-		http.Error(w, "Failed to retrieve lecture: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if lecture == nil {
-		http.Error(w, "Lecture not found", http.StatusNotFound)
-		return
-	}
-	// authorization: verify user owns this course
-	course, err := h.courseService.GetCourseByID(r.Context(), lecture.CourseID)
-	if err != nil || course == nil || course.UserID != userID {
-		http.Error(w, "Lecture not found", http.StatusNotFound)
-		return
-	}
-	// parse query params
-	q := r.URL.Query()
-	// default to a high limit to fetch all if not specified
-	limit := 1000
-	if l := q.Get("limit"); l != "" {
-		if v, err := strconv.Atoi(l); err == nil && v > 0 {
-			limit = v
-		}
-	}
-	offset := 0
-	if o := q.Get("offset"); o != "" {
-		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
-			offset = v
-		}
-	}
-	explanations, err := h.explanationService.GetExplanationsByLectureID(r.Context(), lectureID, limit, offset)
-	if err != nil {
-		http.Error(w, "Failed to retrieve explanations: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	var resp []dto.LectureExplanationResponseDTO
-	for _, e := range explanations {
-		resp = append(resp, dto.LectureExplanationResponseDTO{
-			ID:          e.ID,
-			LectureID:   e.LectureID,
-			SlideNumber: e.SlideNumber,
-			Content:     e.Content,
-			CreatedAt:   e.CreatedAt,
-			UpdatedAt:   e.UpdatedAt,
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")

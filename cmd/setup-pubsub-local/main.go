@@ -108,7 +108,7 @@ func resetLocalEmulator(ctx context.Context, client *pubsub.Client, logger zerol
 
 // createOrUpdateResources ensures all topics and subscriptions exist and are correctly configured for the local environment.
 func createOrUpdateResources(ctx context.Context, client *pubsub.Client, logger zerolog.Logger) {
-	topics := []string{"ingestion", "embedding", "explanation", "summary", "image-analysis"}
+	topics := []string{"ingestion", "embedding", "image-analysis"}
 	sevenDays := 7 * 24 * time.Hour
 
 	for _, topicID := range topics {

@@ -105,8 +105,6 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	userRepo := repository.NewUserRepo(pool)
 	lectureRepo := repository.NewLectureRepository(pool)
 	courseRepo := repository.NewCourseRepo(pool)
-	summaryRepo := repository.NewSummaryRepository(pool)
-	explanationRepo := repository.NewExplanationRepository(pool)
 	noteRepo := repository.NewNoteRepository(pool)
 	chatRepo := repository.NewChatRepo(pool)
 	dlqRepo := repository.NewDLQRepository(pool)
@@ -121,8 +119,6 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	lectureSvc := service.NewLectureService(lectureRepo, userRepo, s3Client, cfg.S3Bucket, pubSubPublisher, cfg.PubSubIngestionTopic, logger)
 	userSvc := service.NewUserService(userRepo, courseRepo, lectureRepo, lectureSvc, secretManagerSvc, openAIValidator, geminiValidator, anthropicValidator, xaiValidator, deepseekValidator, logger)
 	courseSvc := service.NewCourseService(courseRepo, lectureSvc, logger)
-	summarySvc := service.NewSummaryService(summaryRepo, logger)
-	explanationSvc := service.NewExplanationService(explanationRepo, logger)
 	noteSvc := service.NewNoteService(noteRepo, logger)
 	chatSvc := service.NewChatService(chatRepo, lectureRepo, pythonClient, logger)
 	dlqSvc := service.NewDLQService(dlqRepo, logger)
@@ -130,7 +126,7 @@ func New(cfg *config.Config, logger zerolog.Logger) (http.Handler, *pgxpool.Pool
 	userHandler := handler.NewUserHandler(userSvc, validate, logger)
 	courseHandler := handler.NewCourseHandler(courseSvc, validate, logger)
 	chatHandler := handler.NewChatHandler(chatSvc, validate, logger)
-	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, summarySvc, explanationSvc, noteSvc, chatHandler, validate, cfg.S3URL, cfg.S3Bucket, logger)
+	lectureHandler := handler.NewLectureHandler(lectureSvc, courseSvc, noteSvc, chatHandler, validate, cfg.S3URL, cfg.S3Bucket, logger)
 	dlqHandler := handler.NewDLQHandler(dlqSvc, logger)
 
 	// 7. Initialize middleware

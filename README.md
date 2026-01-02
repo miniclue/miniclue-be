@@ -1,13 +1,13 @@
 # miniclue-be
 
-A Go-based backend service for MiniClue, providing lecture processing, AI-powered explanations, and subscription management.
+A Go-based backend service for MiniClue, providing lecture processing, chat interaction, and course management.
 
 ## Features
 
 - RESTful API built in Go (1.22+) using `net/http` and `ServeMux`
 - Supabase PostgreSQL database with migration scripts
 - User authentication and authorization middleware
-- Orchestration pipelines for embeddings, summaries, and explanations
+- Orchestration pipelines for embeddings and image analysis
 - Push-based Google Cloud Pub/Sub handlers for asynchronous processing
 
 ## Project Structure

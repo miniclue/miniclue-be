@@ -66,33 +66,33 @@ jobs:
 
       - name: Deploy to Cloud Run (Staging)
         id: deploy
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: miniclue-be-stg
-          image: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/miniclue-be:${{ github.sha }}
-          region: ${{ secrets.GCP_REGION }}
-          flags: "--allow-unauthenticated"
-          env_vars: |
-            ENV=staging
-            DB_CONNECTION_STRING=${{ secrets.DB_CONNECTION_STRING }}
-            SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}
-            SUPABASE_S3_URL=${{ secrets.SUPABASE_S3_URL }}
-            SUPABASE_S3_BUCKET=${{ secrets.SUPABASE_S3_BUCKET }}
-            SUPABASE_S3_REGION=${{ secrets.SUPABASE_S3_REGION }}
-            SUPABASE_S3_ACCESS_KEY=${{ secrets.SUPABASE_S3_ACCESS_KEY }}
-            SUPABASE_S3_SECRET_KEY=${{ secrets.SUPABASE_S3_SECRET_KEY }}
-            GCP_PROJECT_ID_STAGING=${{ secrets.GCP_PROJECT_ID }}
-            DLQ_ENDPOINT_URL=${{ secrets.DLQ_ENDPOINT_URL }}
-            PUBSUB_PUSH_SERVICE_ACCOUNT_EMAIL=${{ secrets.PUBSUB_PUSH_SERVICE_ACCOUNT_EMAIL }}
-            PYTHON_SERVICE_BASE_URL=${{ secrets.PYTHON_SERVICE_BASE_URL }}
-            STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
-            STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
-            STRIPE_PRICE_MONTHLY=${{ secrets.STRIPE_PRICE_MONTHLY }}
-            STRIPE_PRICE_ANNUAL=${{ secrets.STRIPE_PRICE_ANNUAL }}
-            STRIPE_PRICE_MONTHLY_LAUNCH=${{ secrets.STRIPE_PRICE_MONTHLY_LAUNCH }}
-            STRIPE_PRICE_ANNUAL_LAUNCH=${{ secrets.STRIPE_PRICE_ANNUAL_LAUNCH }}
-            STRIPE_PRICE_FREE=free
-            STRIPE_PORTAL_RETURN_URL=${{ secrets.STRIPE_PORTAL_RETURN_URL }}
+        # We use standard shell command instead of the Action to use --set-env-vars
+        run: |
+          DEPLOY_OUTPUT=$(gcloud run deploy miniclue-be-stg \
+            --image ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/miniclue-be:${{ github.sha }} \
+            --region ${{ secrets.GCP_REGION }} \
+            --allow-unauthenticated \
+            --format="value(status.url)" \
+            --set-env-vars "ENV=staging,\
+            DB_CONNECTION_STRING=${{ secrets.DB_CONNECTION_STRING }},\
+            SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},\
+            SUPABASE_S3_URL=${{ secrets.SUPABASE_S3_URL }},\
+            SUPABASE_S3_BUCKET=${{ secrets.SUPABASE_S3_BUCKET }},\
+            SUPABASE_S3_REGION=${{ secrets.SUPABASE_S3_REGION }},\
+            SUPABASE_S3_ACCESS_KEY=${{ secrets.SUPABASE_S3_ACCESS_KEY }},\
+            SUPABASE_S3_SECRET_KEY=${{ secrets.SUPABASE_S3_SECRET_KEY }},\
+            GCP_PROJECT_ID_STAGING=${{ secrets.GCP_PROJECT_ID }},\
+            DLQ_ENDPOINT_URL=${{ secrets.DLQ_ENDPOINT_URL }},\
+            PUBSUB_PUSH_SERVICE_ACCOUNT_EMAIL=${{ secrets.PUBSUB_PUSH_SERVICE_ACCOUNT_EMAIL }},\
+            PYTHON_SERVICE_BASE_URL=${{ secrets.PYTHON_SERVICE_BASE_URL }}" 2>&1)
+
+          # Extract the URL from the last line of output (or valid URL line) if mixed with logs
+          # Since we used --format="value(status.url)", the stdout should just be the URL.
+          # However, gcloud often prints logs to stderr which is redirected above.
+          # A safer way to just get the URL for the variable:
+          SERVICE_URL=$(echo "$DEPLOY_OUTPUT" | tail -n 1)
+
+          echo "url=$SERVICE_URL" >> $GITHUB_OUTPUT
 
       - name: Show Cloud Run URL
         run: echo "Deployed to ${{ steps.deploy.outputs.url }}"

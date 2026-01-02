@@ -1,4 +1,4 @@
-.PHONY: all build run swagger clean fmt build-worker worker-ingestion worker-embedding worker-explanation worker-summary lint build-setup-pubsub-local setup-pubsub-local deploy-pubsub
+.PHONY: all build run swagger clean fmt build-worker worker-ingestion worker-embedding lint build-setup-pubsub-local setup-pubsub-local deploy-pubsub
 
 # Default target
 all: build

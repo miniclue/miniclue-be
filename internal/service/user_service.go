@@ -120,7 +120,9 @@ var defaultModelCatalog = map[string][]string{
 		"gpt-4.1-mini",
 	},
 	"gemini": {
+		"gemini-2.5-flash",
 		"gemini-3-flash-preview",
+		"gemini-3-pro-preview",
 	},
 	"anthropic": {
 		"claude-sonnet-4-5",

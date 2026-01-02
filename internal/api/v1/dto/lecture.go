@@ -8,6 +8,7 @@ type LectureResponseDTO struct {
 	Title       string    `json:"title"`
 	StoragePath string    `json:"storage_path"`
 	Status      string    `json:"status"`
+	TotalSlides int       `json:"total_slides"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	AccessedAt  time.Time `json:"accessed_at"`

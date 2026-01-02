@@ -44,8 +44,6 @@ CREATE TYPE lecture_status AS ENUM (
   'pending_processing',
   'parsing',
   'processing',    -- Added for the streamlined chat-only flow
-  'explaining',    -- DEPRECATED: Slide-by-slide explanation track removed
-  'summarising',   -- DEPRECATED: Lecture summary track removed
   'complete',
   'failed'
 );
@@ -59,14 +57,10 @@ CREATE TABLE IF NOT EXISTS lectures (
   status                    lecture_status  NOT NULL DEFAULT 'uploading',
 
   -- Error details
-  explanation_error_details JSONB           DEFAULT NULL, -- DEPRECATED
   embedding_error_details   JSONB           DEFAULT NULL,
 
-  -- DEPRECATED: Explanation track progress (kept for legacy records)
-  total_slides              INT             NOT NULL DEFAULT 0,
-  processed_slides          INT             NOT NULL DEFAULT 0,
-
   -- Processing progress and completion flag
+  total_slides              INT             NOT NULL DEFAULT 0,
   total_sub_images          INT             NOT NULL DEFAULT 0,
   processed_sub_images      INT             NOT NULL DEFAULT 0,
   embeddings_complete       BOOLEAN         NOT NULL DEFAULT FALSE,
@@ -133,37 +127,7 @@ CREATE INDEX IF NOT EXISTS idx_embeddings_vector ON embeddings USING ivfflat(vec
 CREATE INDEX IF NOT EXISTS idx_embeddings_lecture_slide ON embeddings(lecture_id, slide_number);
 
 -------------------------------------------------------------------------------
--- 7. Summary Table
--------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS summaries (
-  lecture_id  UUID        PRIMARY KEY REFERENCES lectures(id) ON DELETE CASCADE,
-  content     TEXT        NOT NULL,
-  metadata    JSONB       NOT NULL DEFAULT '{}'::JSONB,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_summaries_by_lecture ON summaries(lecture_id);
-
--------------------------------------------------------------------------------
--- 8. Explanation Table
--------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS explanations (
-  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  slide_id     UUID        NOT NULL REFERENCES slides(id) ON DELETE CASCADE,
-  lecture_id   UUID        NOT NULL,
-  slide_number INT         NOT NULL,
-  content      TEXT        NOT NULL,
-  slide_type   TEXT,
-  metadata     JSONB       NOT NULL DEFAULT '{}'::JSONB,
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(slide_id),
-  FOREIGN KEY (lecture_id, slide_number) REFERENCES slides(lecture_id, slide_number) ON DELETE CASCADE
-);
-CREATE INDEX IF NOT EXISTS idx_explanations_lecture_slide ON explanations(lecture_id, slide_number);
-
--------------------------------------------------------------------------------
--- 9. Slide Images Table
+-- 7. Slide Images Table
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS slide_images (
   id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -184,7 +148,7 @@ CREATE TABLE IF NOT EXISTS slide_images (
 CREATE INDEX IF NOT EXISTS idx_slide_images_lecture_hash ON slide_images(lecture_id, image_hash);
 
 -------------------------------------------------------------------------------
--- 10. Note Table
+-- 8. Note Table
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS notes (
   id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -198,7 +162,7 @@ CREATE INDEX IF NOT EXISTS idx_notes_user_id    ON notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_lecture_id ON notes(lecture_id);
 
 -------------------------------------------------------------------------------
--- 11. Chat Table
+-- 9. Chat Table
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS chats (
   id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -213,7 +177,7 @@ CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats(user_id);
 CREATE INDEX IF NOT EXISTS idx_chats_lecture_user ON chats(lecture_id, user_id);
 
 -------------------------------------------------------------------------------
--- 12. Message Table
+-- 10. Message Table
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS messages (
   id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -227,7 +191,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
 
 -------------------------------------------------------------------------------
--- 13. Dead-Letter Queue Table
+-- 11. Dead-Letter Queue Table
 -------------------------------------------------------------------------------
 CREATE TYPE dlq_message_status AS ENUM (
   'unprocessed',
@@ -249,7 +213,7 @@ CREATE INDEX IF NOT EXISTS idx_dead_letter_messages_status ON dead_letter_messag
 CREATE INDEX IF NOT EXISTS idx_dead_letter_messages_created_at ON dead_letter_messages(created_at);
 
 -------------------------------------------------------------------------------
--- 14. Waitlist Table
+-- 12. Waitlist Table
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS waitlist (
   id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -260,7 +224,7 @@ CREATE TABLE IF NOT EXISTS waitlist (
 CREATE INDEX IF NOT EXISTS idx_waitlist_email ON waitlist(email);
 
 -------------------------------------------------------------------------------
--- 15. Row-Level Security (RLS) Policies
+-- 13. Row-Level Security (RLS) Policies
 -------------------------------------------------------------------------------
 
 -- Enable RLS for all relevant tables
@@ -270,8 +234,6 @@ ALTER TABLE public.lectures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.slides ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chunks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.embeddings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.summaries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.explanations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.slide_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
@@ -315,25 +277,13 @@ CREATE POLICY "Allow read access to embeddings of own lectures" ON public.embedd
   FOR SELECT
   USING (EXISTS (SELECT 1 FROM lectures WHERE lectures.id = embeddings.lecture_id AND lectures.user_id = auth.uid()));
 
--- 7. summaries: Users can only read summaries for lectures they own.
--- Summaries are generated by backend AI processes.
-CREATE POLICY "Allow read access to summaries of own lectures" ON public.summaries
-  FOR SELECT
-  USING (EXISTS (SELECT 1 FROM lectures WHERE lectures.id = summaries.lecture_id AND lectures.user_id = auth.uid()));
-
--- 8. explanations: Users can only read explanations for lectures they own.
--- Explanations are generated by backend AI processes.
-CREATE POLICY "Allow read access to explanations of own lectures" ON public.explanations
-  FOR SELECT
-  USING (EXISTS (SELECT 1 FROM lectures WHERE lectures.id = explanations.lecture_id AND lectures.user_id = auth.uid()));
-
--- 9. slide_images: Users can only read slide image records for lectures they own.
+-- 7. slide_images: Users can only read slide image records for lectures they own.
 -- Slide images are created and processed by backend services.
 CREATE POLICY "Allow read access to slide_images of own lectures" ON public.slide_images
   FOR SELECT
   USING (EXISTS (SELECT 1 FROM lectures WHERE lectures.id = slide_images.lecture_id AND lectures.user_id = auth.uid()));
 
--- 10. notes: Users can manage their own notes.
+-- 8. notes: Users can manage their own notes.
 -- The check ensures notes can only be created for lectures the user owns.
 CREATE POLICY "Allow all access to own notes" ON public.notes
   FOR ALL

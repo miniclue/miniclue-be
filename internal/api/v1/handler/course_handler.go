@@ -243,7 +243,7 @@ func (h *CourseHandler) updateCourse(w http.ResponseWriter, r *http.Request) {
 
 // deleteCourse godoc
 // @Summary Delete a course
-// @Description Deletes a course and all its lectures, removes associated PDFs from storage, clears any pending jobs in ingestion, embedding, explanation, and summary queues, and deletes related database records.
+// @Description Deletes a course and all its lectures, removes associated PDFs from storage, clears any pending jobs in ingestion and embedding queues, and deletes related database records.
 // @Tags courses
 // @Produce json
 // @Param courseId path string true "Course ID"
