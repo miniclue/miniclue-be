@@ -1,180 +1,72 @@
-# miniclue-be
+# MiniClue API Gateway (`miniclue-be`)
 
-A Go-based backend service for MiniClue, providing lecture processing, chat interaction, and course management.
+The Go-based backend service responsible for authentication, orchestration, and serving as the primary API gateway for the MiniClue platform.
 
-## Features
+**Role in Stack:**
 
-- RESTful API built in Go (1.22+) using `net/http` and `ServeMux`
-- Supabase PostgreSQL database with migration scripts
-- User authentication and authorization middleware
-- Orchestration pipelines for embeddings and image analysis
-- Push-based Google Cloud Pub/Sub handlers for asynchronous processing
+- **API Gateway:** Entry point for frontend traffic, handling routing, validation, and CORS.
+- **Authentication:** Validates Supabase JWTs and enforces user-based access control.
+- **Orchestration:** Triggers AI pipelines (ingestion, embedding, image analysis) by publishing messages to Google Cloud Pub/Sub.
+- **Management:** Handles CRUD operations for courses, lectures, and chat history via Supabase Postgres.
 
-## Project Structure
+## 🛠 Prerequisites
 
-```
-miniclue-be/
-├── cmd/
-│   ├── app/          # Main API server entrypoint
-├── internal/         # Application code
-│   ├── api/v1/       # DTOs, handlers, router
-│   ├── config/       # Configuration loader
-│   ├── middleware/   # Logging and auth middleware
-│   ├── model/        # Database models
-│   ├── repository/   # Database access layer
-│   ├── service/      # Business logic
-│   └── orchestrator/ # AI pipelines
-├── supabase/         # Supabase config and migrations
-├── go.mod            # Module definition
-├── go.sum            # Dependency checksums
-├── README.md         # Project overview
-└── PLAN.md           # Development plan
-```
+- **Go 1.24+**
+- **Docker & Docker Compose** (For local Pub/Sub emulator)
+- **Supabase CLI** (For local database management)
+- **Google Cloud SDK** (For local authentication and Secret Manager)
 
-## Getting Started
+## 🚀 Quick Start
 
-### Prerequisites
+> See [CONTRIBUTING.md](https://github.com/miniclue/miniclue-info/blob/main/CONTRIBUTING.md) for full details on how to setup and contribute to the project.
 
-- Go 1.22+ installed
-- Docker and Docker Compose installed
-
-### Installation
+1. **Fork & Clone**
 
 ```bash
+# Fork the repository on GitHub first, then:
 git clone https://github.com/your-username/miniclue-be.git
 cd miniclue-be
+git remote add upstream https://github.com/miniclue/miniclue-be.git
 go mod download
 ```
 
-### Configuration
-
-1.  Set up your Supabase project locally or in the cloud.
-2.  Export the required environment variables. See `.env.example` for reference.
-
-## Local Development
-
-### 1. Start Local Services (Local Development Only)
-
-This project uses Docker Compose to run the Google Cloud Pub/Sub emulator.
+2. **Environment Setup**
+   Copy the example config:
 
 ```bash
+cp .env.example .env
+```
+
+_Ensure you populate all fields as stated in the `.env.example` file. For local development, you will need a GCP project to use Secret Manager._
+
+3. **Local Infrastructure**
+
+```bash
+# Start Supabase (Postgres & Storage)
+supabase start
+
+# Start Pub/Sub Emulator
 docker-compose up -d
-```
 
-### 2. Set Up Google Cloud Secret Manager (Local Development)
-
-Secret Manager requires a real GCP project even for local development. You'll need to create a dedicated GCP project for local development.
-
-**Step 1: Create a GCP Project for Local Development**
-
-```bash
-# Create a new GCP project (or use an existing one)
-gcloud projects create miniclue-gcp-local-sr --name="MiniClue - Local SR"
-gcloud config set project miniclue-gcp-local-sr
-```
-
-**Step 2: Enable Secret Manager API**
-
-```bash
-gcloud services enable secretmanager.googleapis.com --project=miniclue-gcp-local-sr
-```
-
-**Step 3: Set Up Authentication**
-
-For local development, use Application Default Credentials (your personal account). This authenticates your local machine to access Secret Manager:
-
-```bash
-gcloud auth application-default login
-```
-
-**Important**: Grant your personal account the necessary permissions:
-
-```bash
-# Grant yourself Secret Manager Admin role for local development
-gcloud projects add-iam-policy-binding miniclue-gcp-local-sr \
-  --member="user:$(gcloud config get-value account)" \
-  --role="roles/secretmanager.admin"
-```
-
-**Step 4: Set Environment Variables**
-
-**Note**: Service accounts are only needed for production/staging environments where services run without user interaction. For local development, Application Default Credentials with your personal account is sufficient.
-
-Add to your `.env` file:
-
-```bash
-# GCP Project IDs
-GCP_PROJECT_ID_LOCAL=miniclue-gcp-local-sr
-GCP_PROJECT_ID_STAGING=miniclue-gcp-stg
-GCP_PROJECT_ID_PROD=miniclue-gcp-prod
-
-# Environment
-ENV=development
-```
-
-**Note**: For production/staging, the AI service (`miniclue-ai`) also needs access to Secret Manager. Ensure the Python service's service account has the `Secret Manager Secret Accessor` role in the same project. For local development, the AI service can also use Application Default Credentials.
-
-### 3. Set Up Pub/Sub Environment
-
-This step uses a Go program to configure Pub/Sub topics and subscriptions. It can target your local emulator, staging, or production.
-
-**Important**: Before running for `staging` or `production`, you must authenticate with Google Cloud:
-
-```bash
-gcloud auth application-default login
-```
-
-The account you use must have the `Pub/Sub Editor` role on the target GCP project.
-
-To run the setup:
-
-```bash
-# For local development (resets all topics/subscriptions)
+# Setup Topics and Subscriptions
 make setup-pubsub-local
-
-# For staging (creates or updates resources, does not delete)
-make deploy-pubsub env=staging
-
-# For production (creates or updates resources, does not delete)
-make deploy-pubsub env=production
 ```
 
-### 4. Run the API Server
-
-To build and run the main API server:
+4. **Run Locally**
 
 ```bash
 make run
+# Service will run at http://127.0.0.1:8080
 ```
 
-The API server will now be running and connected to the local Pub/Sub emulator.
+## 📝 Pull Request Process
 
-### 5. Update swagger documentation
+1. Create a new branch for your feature or bugfix: `git checkout -b feature/my-cool-improvement`.
+2. Ensure your code follows the coding standards and project architecture.
+3. Update Swagger documentation if you changed API handlers: `make swagger`.
+4. Push to your fork: `git push origin feature/my-cool-improvement`.
+5. Submit a Pull Request from your fork to the original repository's `main` branch.
+6. Once your PR is approved and merged into `main`, the CI/CD pipeline will automatically deploy it to the [staging environment](https://stg.api.miniclue.com) for verification.
+7. Once a new release is created, the CI/CD pipeline will automatically deploy it to the [production environment](https://api.miniclue.com).
 
-```bash
-make swagger
-```
-
-This will generate the `swagger.json` file in the `docs` directory.
-
-### 6. Update local Supabase database
-
-- Make updates to the `supabase/schemas/schema.sql` file.
-- Run `supabase db diff -f [filename]` to generate a migration file.
-- Run `supabase migration up` to apply the migration to the local database.
-
-## CI/CD Workflow
-
-### Staging Environment
-
-1. A developer writes code on a feature branch and opens a Pull Request to `main`.
-2. After code review and approval, the PR is merged.
-3. The merge to `main` automatically triggers a GitHub Actions workflow (`cd.yml`).
-4. This workflow builds a Docker image tagged with the commit SHA and deploys it to the **staging** environment.
-
-### Production Environment
-
-1. After changes are verified in staging, a release can be deployed to production.
-2. Create a new release on the GitHub repository.
-3. This will trigger the release workflow (`release.yml`).
-4. This workflow builds a Docker image tagged with the version (e.g., `v1.0.0`) and deploys it to the **production** environment.
+> Note: Merging of PR and creation of release will be done by repo maintainers.
