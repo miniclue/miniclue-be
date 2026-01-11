@@ -34,13 +34,12 @@ fmt:
 # Lint
 lint:
 	@echo "Linting code..."
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	golangci-lint run
+	@echo "Linting completed"
 
 # Generate Swagger documentation
 swagger:
 	@echo "Generating Swagger documentation..."
-	go install github.com/swaggo/swag/cmd/swag@latest
 	swag init --parseInternal --generalInfo cmd/app/main.go --output docs/swagger
 	@echo "Swagger documentation generated in docs/swagger"
 

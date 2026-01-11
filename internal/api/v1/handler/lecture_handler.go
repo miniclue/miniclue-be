@@ -136,15 +136,16 @@ func (h *LectureHandler) getLecture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := dto.LectureResponseDTO{
-		LectureID:   lecture.ID,
-		CourseID:    lecture.CourseID,
-		Title:       lecture.Title,
-		StoragePath: lecture.StoragePath,
-		Status:      lecture.Status,
-		TotalSlides: lecture.TotalSlides,
-		CreatedAt:   lecture.CreatedAt,
-		UpdatedAt:   lecture.UpdatedAt,
-		AccessedAt:  lecture.AccessedAt,
+		LectureID:             lecture.ID,
+		CourseID:              lecture.CourseID,
+		Title:                 lecture.Title,
+		StoragePath:           lecture.StoragePath,
+		Status:                lecture.Status,
+		EmbeddingErrorDetails: map[string]interface{}(lecture.EmbeddingErrorDetails),
+		TotalSlides:           lecture.TotalSlides,
+		CreatedAt:             lecture.CreatedAt,
+		UpdatedAt:             lecture.UpdatedAt,
+		AccessedAt:            lecture.AccessedAt,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
@@ -225,15 +226,16 @@ func (h *LectureHandler) updateLecture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := dto.LectureResponseDTO{
-		LectureID:   lecture.ID,
-		CourseID:    lecture.CourseID,
-		Title:       lecture.Title,
-		StoragePath: lecture.StoragePath,
-		Status:      lecture.Status,
-		TotalSlides: lecture.TotalSlides,
-		CreatedAt:   lecture.CreatedAt,
-		UpdatedAt:   lecture.UpdatedAt,
-		AccessedAt:  lecture.AccessedAt,
+		LectureID:             lecture.ID,
+		CourseID:              lecture.CourseID,
+		Title:                 lecture.Title,
+		StoragePath:           lecture.StoragePath,
+		Status:                lecture.Status,
+		EmbeddingErrorDetails: map[string]interface{}(lecture.EmbeddingErrorDetails),
+		TotalSlides:           lecture.TotalSlides,
+		CreatedAt:             lecture.CreatedAt,
+		UpdatedAt:             lecture.UpdatedAt,
+		AccessedAt:            lecture.AccessedAt,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
@@ -345,15 +347,16 @@ func (h *LectureHandler) listLectures(w http.ResponseWriter, r *http.Request) {
 	var resp []dto.LectureResponseDTO
 	for _, lec := range lectures {
 		resp = append(resp, dto.LectureResponseDTO{
-			LectureID:   lec.ID,
-			CourseID:    lec.CourseID,
-			Title:       lec.Title,
-			StoragePath: lec.StoragePath,
-			Status:      lec.Status,
-			TotalSlides: lec.TotalSlides,
-			CreatedAt:   lec.CreatedAt,
-			UpdatedAt:   lec.UpdatedAt,
-			AccessedAt:  lec.AccessedAt,
+			LectureID:             lec.ID,
+			CourseID:              lec.CourseID,
+			Title:                 lec.Title,
+			StoragePath:           lec.StoragePath,
+			Status:                lec.Status,
+			EmbeddingErrorDetails: lec.EmbeddingErrorDetails,
+			TotalSlides:           lec.TotalSlides,
+			CreatedAt:             lec.CreatedAt,
+			UpdatedAt:             lec.UpdatedAt,
+			AccessedAt:            lec.AccessedAt,
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")

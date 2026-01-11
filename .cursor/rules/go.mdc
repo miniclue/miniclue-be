@@ -36,4 +36,4 @@ Leverage the power and simplicity of Go's standard library to create efficient a
 
 Do not write any migrations. Only make edits to the Supabase database schema. Migrations will be handled by myself.
 
-Write all necessary godoc comments. Do not run 'make swagger' to update the Swagger documentation. I will run it myself after you have finished implementing the feature.
+Write all necessary godoc comments. Run 'make swagger' to update the Swagger documentation after you have finished implementing the feature.

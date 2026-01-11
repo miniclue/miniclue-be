@@ -115,7 +115,7 @@ func (r *lectureRepository) GetLecturesByCourseID(ctx context.Context, courseID 
 
 func (r *lectureRepository) GetLectureByID(ctx context.Context, lectureID string) (*model.Lecture, error) {
 	query := `
-		SELECT id, user_id, course_id, title, storage_path, status, total_slides, created_at, updated_at, accessed_at
+		SELECT id, user_id, course_id, title, storage_path, status, embedding_error_details, total_slides, created_at, updated_at, accessed_at
 		FROM lectures
 		WHERE id = $1
 	`
@@ -127,6 +127,7 @@ func (r *lectureRepository) GetLectureByID(ctx context.Context, lectureID string
 		&lecture.Title,
 		&lecture.StoragePath,
 		&lecture.Status,
+		&lecture.EmbeddingErrorDetails,
 		&lecture.TotalSlides,
 		&lecture.CreatedAt,
 		&lecture.UpdatedAt,
