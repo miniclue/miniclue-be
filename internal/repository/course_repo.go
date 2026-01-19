@@ -17,6 +17,7 @@ type CourseRepository interface {
 	CreateCourse(ctx context.Context, c *model.Course) error
 	// GetCourseByID retrieves a course by its ID
 	GetCourseByID(ctx context.Context, courseID string) (*model.Course, error)
+	GetDefaultCourseByUserID(ctx context.Context, userID string) (*model.Course, error)
 	// UpdateCourse updates an existing course
 	UpdateCourse(ctx context.Context, c *model.Course) error
 	// DeleteCourse deletes a course by its ID
@@ -111,6 +112,32 @@ func (r *courseRepo) GetCourseByID(ctx context.Context, courseID string) (*model
 			return nil, nil
 		}
 		return nil, fmt.Errorf("getting course by id %s: %w", courseID, err)
+	}
+	return &c, nil
+}
+
+func (r *courseRepo) GetDefaultCourseByUserID(ctx context.Context, userID string) (*model.Course, error) {
+	query := `
+		SELECT id, user_id, title, description, is_default, created_at, updated_at
+		FROM courses
+		WHERE user_id = $1 AND is_default = TRUE
+		LIMIT 1
+	`
+	var c model.Course
+	err := r.pool.QueryRow(ctx, query, userID).Scan(
+		&c.CourseID,
+		&c.UserID,
+		&c.Title,
+		&c.Description,
+		&c.IsDefault,
+		&c.CreatedAt,
+		&c.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("getting default course by user id %s: %w", userID, err)
 	}
 	return &c, nil
 }
