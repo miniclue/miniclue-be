@@ -17,6 +17,7 @@ type Lecture struct {
 	Status                string                `db:"status" json:"status"` // e.g., "uploaded", "parsed", "explained"
 	EmbeddingErrorDetails EmbeddingErrorDetails `db:"embedding_error_details" json:"embedding_error_details"`
 	TotalSlides           int                   `db:"total_slides" json:"total_slides"`
+	EmbeddingsComplete    bool                  `db:"embeddings_complete" json:"embeddings_complete"`
 	CreatedAt             time.Time             `db:"created_at" json:"created_at"`
 	UpdatedAt             time.Time             `db:"updated_at" json:"updated_at"`
 	AccessedAt            time.Time             `db:"accessed_at" json:"accessed_at"`

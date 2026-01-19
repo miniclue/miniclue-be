@@ -156,10 +156,17 @@ func NewUserService(userRepo repository.UserRepository, courseRepo repository.Co
 
 func (s *userService) Create(ctx context.Context, u *model.User) (*model.User, error) {
 	// Check if user already exists first
-	_, err := s.userRepo.GetUserByID(ctx, u.UserID)
-	if err != nil && !errors.Is(err, ErrUserNotFound) {
-		s.userLogger.Error().Err(err).Str("user_id", u.UserID).Msg("Failed to check if user exists")
-		return nil, err
+	existingUser, err := s.userRepo.GetUserByID(ctx, u.UserID)
+	isNewUser := false
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			isNewUser = true
+		} else {
+			s.userLogger.Error().Err(err).Str("user_id", u.UserID).Msg("Failed to check if user exists")
+			return nil, err
+		}
+	} else if existingUser == nil {
+		isNewUser = true
 	}
 
 	// Create/update user in database
@@ -167,6 +174,25 @@ func (s *userService) Create(ctx context.Context, u *model.User) (*model.User, e
 	if err != nil {
 		s.userLogger.Error().Err(err).Str("user_id", u.UserID).Msg("Failed to create/update user")
 		return nil, err
+	}
+
+	// If it's a new user, provision the default course and setup guide
+	if isNewUser {
+		// 1. Create default "Drafts" course
+		draftsCourse := &model.Course{
+			UserID:      u.UserID,
+			Title:       "Drafts",
+			Description: "Default course",
+			IsDefault:   true,
+		}
+		if err := s.courseRepo.CreateCourse(ctx, draftsCourse); err != nil {
+			s.userLogger.Error().Err(err).Str("user_id", u.UserID).Msg("Failed to create default Drafts course")
+		} else {
+			// 2. Provision the setup PDF under the Drafts course
+			if _, err := s.lectureSvc.ProvisionWelcomeLecture(ctx, draftsCourse.CourseID, u.UserID); err != nil {
+				s.userLogger.Error().Err(err).Str("user_id", u.UserID).Msg("Failed to provision welcome setup PDF")
+			}
+		}
 	}
 
 	return u, nil
