@@ -176,7 +176,7 @@ func (s *userService) Create(ctx context.Context, u *model.User) (*model.User, e
 		return nil, err
 	}
 
-	// If it's a new user, provision the default course and setup guide
+	// If it's a new user, provision the default course
 	if isNewUser {
 		// 1. Create default "Drafts" course
 		draftsCourse := &model.Course{
@@ -187,11 +187,6 @@ func (s *userService) Create(ctx context.Context, u *model.User) (*model.User, e
 		}
 		if err := s.courseRepo.CreateCourse(ctx, draftsCourse); err != nil {
 			s.userLogger.Error().Err(err).Str("user_id", u.UserID).Msg("Failed to create default Drafts course")
-		} else {
-			// 2. Provision the setup PDF under the Drafts course
-			if _, err := s.lectureSvc.ProvisionWelcomeLecture(ctx, draftsCourse.CourseID, u.UserID); err != nil {
-				s.userLogger.Error().Err(err).Str("user_id", u.UserID).Msg("Failed to provision welcome setup PDF")
-			}
 		}
 	}
 
@@ -206,46 +201,6 @@ func (s *userService) Get(ctx context.Context, id string) (*model.User, error) {
 	}
 	if u == nil {
 		return nil, ErrUserNotFound
-	}
-
-	// On-the-fly provisioning for existing users missing Gemini key and setup guide
-	hasGeminiKey := u.APIKeysProvided["gemini"]
-	if !hasGeminiKey {
-		setupTitle := "How to add Gemini API Key"
-		exists, err := s.lectureRepo.HasLectureByTitle(ctx, id, setupTitle)
-		if err == nil && !exists {
-			s.userLogger.Info().Str("user_id", id).Msg("User missing setup guide, attempting on-the-fly provisioning")
-
-			// Find or create Drafts course
-			draftsCourse, err := s.courseRepo.GetDefaultCourseByUserID(ctx, id)
-			if err != nil {
-				s.userLogger.Error().Err(err).Str("user_id", id).Msg("Failed to check for default course during on-the-fly provisioning")
-			} else {
-				var courseID string
-				if draftsCourse == nil {
-					// Create it if it doesn't exist (though it should for most users)
-					newDrafts := &model.Course{
-						UserID:      id,
-						Title:       "Drafts",
-						Description: "Default course",
-						IsDefault:   true,
-					}
-					if err := s.courseRepo.CreateCourse(ctx, newDrafts); err != nil {
-						s.userLogger.Error().Err(err).Str("user_id", id).Msg("Failed to create missing default course during on-the-fly provisioning")
-					} else {
-						courseID = newDrafts.CourseID
-					}
-				} else {
-					courseID = draftsCourse.CourseID
-				}
-
-				if courseID != "" {
-					if _, err := s.lectureSvc.ProvisionWelcomeLecture(ctx, courseID, id); err != nil {
-						s.userLogger.Error().Err(err).Str("user_id", id).Msg("Failed to provision welcome setup PDF on-the-fly")
-					}
-				}
-			}
-		}
 	}
 
 	return u, nil

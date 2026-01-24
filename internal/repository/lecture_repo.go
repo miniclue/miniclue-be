@@ -19,7 +19,6 @@ type LectureRepository interface {
 	UpdateLecture(ctx context.Context, l *model.Lecture) error
 	CreateLecture(ctx context.Context, lecture *model.Lecture) (*model.Lecture, error)
 	CountLecturesByUserID(ctx context.Context, userID string) (int, error)
-	HasLectureByTitle(ctx context.Context, userID, title string) (bool, error)
 }
 
 type lectureRepository struct {
@@ -198,14 +197,4 @@ func (r *lectureRepository) CountLecturesByUserID(ctx context.Context, userID st
 		return 0, fmt.Errorf("counting lectures for user %s: %w", userID, err)
 	}
 	return count, nil
-}
-
-func (r *lectureRepository) HasLectureByTitle(ctx context.Context, userID, title string) (bool, error) {
-	var exists bool
-	query := `SELECT EXISTS(SELECT 1 FROM lectures WHERE user_id = $1 AND title = $2)`
-	err := r.pool.QueryRow(ctx, query, userID, title).Scan(&exists)
-	if err != nil {
-		return false, fmt.Errorf("checking if lecture exists by title: %w", err)
-	}
-	return exists, nil
 }

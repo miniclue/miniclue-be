@@ -29,7 +29,6 @@ type LectureService interface {
 	InitiateUpload(ctx context.Context, courseID, userID, filename string) (*model.Lecture, string, error)
 	InitiateBatchUpload(ctx context.Context, courseID, userID string, filenames []string) ([]*model.Lecture, []string, error)
 	CompleteUpload(ctx context.Context, lectureID, userID string) (*model.Lecture, error)
-	ProvisionWelcomeLecture(ctx context.Context, courseID, userID string) (*model.Lecture, error)
 }
 
 // lectureService is the implementation of LectureService
@@ -202,55 +201,6 @@ func (s *lectureService) CompleteUpload(ctx context.Context, lectureID, userID s
 	}
 
 	return lecture, nil
-}
-
-// ProvisionWelcomeLecture copies the template setup PDF and creates a completed lecture record.
-func (s *lectureService) ProvisionWelcomeLecture(ctx context.Context, courseID, userID string) (*model.Lecture, error) {
-	// 1. Create the lecture record first to get an ID
-	lecture := &model.Lecture{
-		CourseID:           courseID,
-		UserID:             userID,
-		Title:              "How to add Gemini API Key",
-		Status:             "complete",
-		EmbeddingsComplete: true,
-	}
-
-	createdLecture, err := s.repo.CreateLecture(ctx, lecture)
-	if err != nil {
-		s.lectureLogger.Error().Err(err).Msg("Failed to create welcome lecture record")
-		return nil, fmt.Errorf("failed to create welcome lecture: %w", err)
-	}
-
-	// 2. Define paths
-	templatePath := "templates/miniclue-setup.pdf"
-	storagePath := fmt.Sprintf("lectures/%s/original.pdf", createdLecture.ID)
-
-	// 3. Copy the template in S3
-	copySource := fmt.Sprintf("%s/%s", s.bucketName, templatePath)
-	_, err = s.s3Client.CopyObject(ctx, &s3.CopyObjectInput{
-		Bucket:     aws.String(s.bucketName),
-		CopySource: aws.String(copySource),
-		Key:        aws.String(storagePath),
-	})
-	if err != nil {
-		s.lectureLogger.Error().
-			Err(err).
-			Str("source", copySource).
-			Str("target", storagePath).
-			Msg("Failed to copy welcome PDF template in S3")
-		// Clean up DB record if S3 copy fails
-		_ = s.repo.DeleteLecture(ctx, createdLecture.ID)
-		return nil, fmt.Errorf("failed to copy template PDF: %w", err)
-	}
-
-	// 4. Update lecture with the final storage path
-	createdLecture.StoragePath = storagePath
-	if err := s.repo.UpdateLecture(ctx, createdLecture); err != nil {
-		s.lectureLogger.Error().Err(err).Str("lecture_id", createdLecture.ID).Msg("Failed to update welcome lecture with storage path")
-		return nil, fmt.Errorf("failed to update welcome lecture: %w", err)
-	}
-
-	return createdLecture, nil
 }
 
 // GetLecturesByCourseID retrieves lectures for a given course with pagination
